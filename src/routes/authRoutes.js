@@ -39,6 +39,16 @@ router.post(
   authController.resetPassword
 );
 
+// Admin registration (requires secret key)
+router.post(
+  '/register-admin',
+  authLimiter,
+  authController.registerAdmin
+);
+
+// Email verification (public - user clicks link from email)
+router.post('/verify-email', authController.verifyEmail);
+
 // Protected routes
 router.use(protect);
 
@@ -55,7 +65,7 @@ router.post(
 router.put('/profile', authController.updateProfile);
 router.put('/profile-photo', authController.updateProfilePhoto);
 
-router.post('/verify-email', authController.verifyEmail);
+router.post('/resend-email-verification', authController.resendEmailVerification);
 router.post('/verify-phone/request', authController.requestPhoneVerification);
 router.post('/verify-phone', authController.verifyPhone);
 

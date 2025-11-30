@@ -5,7 +5,6 @@ const { protect, restrictTo } = require('../middlewares/auth');
 const { paramValidations, validate, paginationValidations } = require('../middlewares/validation');
 
 // Public routes
-router.get('/search', protect, userController.searchUsers);
 router.get('/vendors', paginationValidations, validate, userController.getVendors);
 router.get('/:id/profile', paramValidations.mongoId, validate, userController.getUserProfile);
 router.get('/:id/stats', paramValidations.mongoId, validate, userController.getUserStats);
@@ -13,6 +12,11 @@ router.get('/:id/stats', paramValidations.mongoId, validate, userController.getU
 // Protected routes
 router.use(protect);
 
+// Current user routes (must be before /:id routes)
+router.get('/me', userController.getMe);
+router.put('/me', userController.updateMe);
+router.put('/update-password', userController.updatePassword);
+router.get('/search', userController.searchUsers);
 router.get('/nearby', userController.getNearbyUsers);
 
 // Admin routes

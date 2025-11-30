@@ -5,6 +5,8 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 const { hashToken } = require('../utils/helpers');
+const emailService = require('../services/emailService');
+const smsService = require('../services/smsService');
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
@@ -15,34 +17,81 @@ exports.register = catchAsync(async (req, res, next) => {
   // Check if user exists
   const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
   if (existingUser) {
+    // If user exists but email not verified, allow re-registration (resend verification)
+    if (!existingUser.emailVerified) {
+      // Generate new verification token
+      const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+      existingUser.emailVerificationToken = hashToken(emailVerificationToken);
+      existingUser.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000;
+      await existingUser.save();
+
+      // Send verification email
+      const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+      try {
+        await emailService.sendEmailVerification(existingUser, verificationUrl);
+      } catch (error) {
+        console.error('Failed to send verification email:', error.message);
+      }
+
+      return res.status(200).json(
+        ApiResponse.success(
+          {
+            message: 'A verification email has been sent. Please check your inbox.',
+            email: existingUser.email,
+            ...(process.env.NODE_ENV === 'development' && {
+              _dev: { emailVerificationUrl: verificationUrl }
+            })
+          },
+          'Verification email resent. Please verify your email to continue.'
+        )
+      );
+    }
     return next(new ApiError('User already exists with this email or phone', 400));
   }
 
-  // Create user
+  // Generate email verification token
+  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  const hashedEmailToken = hashToken(emailVerificationToken);
+
+  // Create user (NOT verified yet, NO tokens issued)
   const user = await User.create({
     email,
     password,
     phone,
     name,
     city,
-    userType: userType || 'all'
+    userType: userType || 'all',
+    emailVerified: false,
+    phoneVerified: false,
+    emailVerificationToken: hashedEmailToken,
+    emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
   });
 
-  // Generate tokens
-  const accessToken = user.generateAccessToken();
-  const refreshToken = user.generateRefreshToken();
+  // Send email verification link
+  const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+  let emailSent = false;
+  try {
+    await emailService.sendEmailVerification(user, verificationUrl);
+    emailSent = true;
+  } catch (error) {
+    console.error('Failed to send verification email:', error.message);
+  }
 
-  // Store refresh token
-  user.refreshTokens.push(refreshToken);
-  await user.save();
-
+  // Response - NO tokens until email is verified
   res.status(201).json(
     ApiResponse.success(
       {
-        user,
-        tokens: { accessToken, refreshToken }
+        message: 'Registration successful. Please verify your email to login.',
+        email: user.email,
+        emailSent,
+        // For development - remove in production
+        ...(process.env.NODE_ENV === 'development' && {
+          _dev: {
+            emailVerificationUrl: verificationUrl
+          }
+        })
       },
-      'User registered successfully'
+      'Please check your email and click the verification link to complete registration.'
     )
   );
 });
@@ -79,6 +128,37 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new ApiError('Your account has been banned', 403));
   }
 
+  // Check email verification status
+  if (!user.emailVerified) {
+    // Generate new verification token for unverified user
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = hashToken(emailVerificationToken);
+    user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    await user.save();
+
+    // Send verification email
+    const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+    try {
+      await emailService.sendEmailVerification(user, verificationUrl);
+    } catch (error) {
+      console.error('Failed to send verification email:', error.message);
+    }
+
+    return res.status(403).json(
+      ApiResponse.error(
+        'Email not verified. A new verification link has been sent to your email.',
+        403,
+        {
+          emailVerified: false,
+          requiresVerification: true,
+          ...(process.env.NODE_ENV === 'development' && {
+            _dev: { emailVerificationUrl: verificationUrl }
+          })
+        }
+      )
+    );
+  }
+
   // Generate tokens
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
@@ -95,11 +175,18 @@ exports.login = catchAsync(async (req, res, next) => {
   user.password = undefined;
   user.refreshTokens = undefined;
 
+  // Build verification status
+  const verificationStatus = {
+    emailVerified: user.emailVerified,
+    phoneVerified: user.phoneVerified
+  };
+
   res.json(
     ApiResponse.success(
       {
         user,
-        tokens: { accessToken, refreshToken }
+        tokens: { accessToken, refreshToken },
+        verificationStatus
       },
       'Login successful'
     )
@@ -305,25 +392,133 @@ exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
   res.json(ApiResponse.success(user, 'Profile photo updated successfully'));
 });
 
-// @desc    Verify email
+// @desc    Verify email with token
 // @route   POST /api/v1/auth/verify-email
-// @access  Private
+// @access  Public
 exports.verifyEmail = catchAsync(async (req, res, next) => {
   const { token } = req.body;
 
-  // TODO: Implement email verification logic
-  // This would typically involve sending a verification link via email
+  if (!token) {
+    return next(new ApiError('Verification token is required', 400));
+  }
 
-  res.json(ApiResponse.success(null, 'Email verified successfully'));
+  const hashedToken = hashToken(token);
+
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpires: { $gt: Date.now() }
+  }).select('+refreshTokens');
+
+  if (!user) {
+    return next(new ApiError('Invalid or expired verification token', 400));
+  }
+
+  // Mark email as verified
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+
+  // Generate tokens NOW (first time user gets tokens)
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  // Store refresh token
+  user.refreshTokens = user.refreshTokens || [];
+  user.refreshTokens.push(refreshToken);
+  await user.save();
+
+  // Send welcome email
+  try {
+    await emailService.sendWelcomeEmail(user);
+  } catch (error) {
+    console.error('Failed to send welcome email:', error.message);
+  }
+
+  res.json(
+    ApiResponse.success(
+      {
+        user,
+        tokens: { accessToken, refreshToken },
+        emailVerified: true
+      },
+      'Email verified successfully. You are now logged in.'
+    )
+  );
 });
 
-// @desc    Request phone verification
+// @desc    Resend email verification
+// @route   POST /api/v1/auth/resend-email-verification
+// @access  Private
+exports.resendEmailVerification = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (user.emailVerified) {
+    return next(new ApiError('Email is already verified', 400));
+  }
+
+  // Generate new verification token
+  const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+  user.emailVerificationToken = hashToken(emailVerificationToken);
+  user.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  await user.save();
+
+  // Send verification email
+  const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+  try {
+    await emailService.sendEmailVerification(user, verificationUrl);
+  } catch (error) {
+    console.error('Failed to send verification email:', error.message);
+    return next(new ApiError('Failed to send verification email', 500));
+  }
+
+  res.json(
+    ApiResponse.success(
+      {
+        message: 'Verification email sent',
+        ...(process.env.NODE_ENV === 'development' && {
+          _dev: { emailVerificationUrl: verificationUrl }
+        })
+      },
+      'Verification email sent successfully'
+    )
+  );
+});
+
+// @desc    Request phone verification (send OTP)
 // @route   POST /api/v1/auth/verify-phone/request
 // @access  Private
 exports.requestPhoneVerification = catchAsync(async (req, res, next) => {
-  // TODO: Implement phone verification via SMS/OTP
+  const user = await User.findById(req.user._id);
 
-  res.json(ApiResponse.success(null, 'OTP sent to your phone'));
+  if (user.phoneVerified) {
+    return next(new ApiError('Phone is already verified', 400));
+  }
+
+  // Generate new OTP
+  const phoneOTP = smsService.generateOTP(6);
+  user.phoneOTP = phoneOTP;
+  user.phoneOTPExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+  await user.save();
+
+  // Send OTP via SMS
+  try {
+    await smsService.sendOTP(user.phone, phoneOTP);
+  } catch (error) {
+    console.error('Failed to send OTP:', error.message);
+  }
+
+  res.json(
+    ApiResponse.success(
+      {
+        message: 'OTP sent to your phone',
+        expiresIn: '10 minutes',
+        ...(process.env.NODE_ENV === 'development' && {
+          _dev: { phoneOTP: phoneOTP }
+        })
+      },
+      'OTP sent successfully'
+    )
+  );
 });
 
 // @desc    Verify phone with OTP
@@ -332,13 +527,81 @@ exports.requestPhoneVerification = catchAsync(async (req, res, next) => {
 exports.verifyPhone = catchAsync(async (req, res, next) => {
   const { otp } = req.body;
 
-  // TODO: Implement OTP verification logic
+  if (!otp) {
+    return next(new ApiError('OTP is required', 400));
+  }
 
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { phoneVerified: true },
-    { new: true }
+  const user = await User.findById(req.user._id).select('+phoneOTP');
+
+  if (user.phoneVerified) {
+    return next(new ApiError('Phone is already verified', 400));
+  }
+
+  if (!user.phoneOTP || !user.phoneOTPExpires) {
+    return next(new ApiError('No OTP request found. Please request a new OTP', 400));
+  }
+
+  if (Date.now() > user.phoneOTPExpires) {
+    return next(new ApiError('OTP has expired. Please request a new one', 400));
+  }
+
+  if (user.phoneOTP !== otp) {
+    return next(new ApiError('Invalid OTP', 400));
+  }
+
+  // Mark phone as verified
+  user.phoneVerified = true;
+  user.phoneOTP = undefined;
+  user.phoneOTPExpires = undefined;
+  await user.save();
+
+  res.json(ApiResponse.success({ phoneVerified: true }, 'Phone verified successfully'));
+});
+
+// @desc    Register admin (requires secret key)
+// @route   POST /api/v1/auth/register-admin
+// @access  Public (but requires ADMIN_SECRET)
+exports.registerAdmin = catchAsync(async (req, res, next) => {
+  const { email, password, phone, name, city, adminSecret } = req.body;
+
+  // Verify admin secret key
+  const validSecret = process.env.ADMIN_SECRET || 'festivo-admin-secret-2024';
+  if (adminSecret !== validSecret) {
+    return next(new ApiError('Invalid admin secret key', 403));
+  }
+
+  // Check if user exists
+  const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
+  if (existingUser) {
+    return next(new ApiError('User already exists with this email or phone', 400));
+  }
+
+  // Create admin user
+  const user = await User.create({
+    email,
+    password,
+    phone,
+    name,
+    city,
+    userType: 'all',
+    role: 'admin'
+  });
+
+  // Generate tokens
+  const accessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  // Store refresh token
+  user.refreshTokens.push(refreshToken);
+  await user.save();
+
+  res.status(201).json(
+    ApiResponse.success(
+      {
+        user,
+        tokens: { accessToken, refreshToken }
+      },
+      'Admin registered successfully'
+    )
   );
-
-  res.json(ApiResponse.success(user, 'Phone verified successfully'));
 });

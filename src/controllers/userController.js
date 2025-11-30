@@ -3,6 +3,67 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 
+// @desc    Get current user profile
+// @route   GET /api/v1/users/me
+// @access  Private
+exports.getMe = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  res.json(ApiResponse.success(user, 'Profile retrieved successfully'));
+});
+
+// @desc    Update current user profile
+// @route   PUT /api/v1/users/me
+// @access  Private
+exports.updateMe = catchAsync(async (req, res, next) => {
+  // Fields that users can update themselves
+  const allowedFields = ['name', 'bio', 'city', 'interests', 'profilePhoto', 'socialLinks', 'notifications'];
+  const updates = {};
+
+  allowedFields.forEach(field => {
+    if (req.body[field] !== undefined) {
+      updates[field] = req.body[field];
+    }
+  });
+
+  // Update location if coordinates provided
+  if (req.body.lng && req.body.lat) {
+    updates.location = {
+      type: 'Point',
+      coordinates: [parseFloat(req.body.lng), parseFloat(req.body.lat)]
+    };
+  }
+
+  const user = await User.findByIdAndUpdate(req.user._id, updates, {
+    new: true,
+    runValidators: true
+  });
+
+  res.json(ApiResponse.success(user, 'Profile updated successfully'));
+});
+
+// @desc    Update current user password
+// @route   PUT /api/v1/users/update-password
+// @access  Private
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return next(new ApiError('Please provide current and new password', 400));
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) {
+    return next(new ApiError('Current password is incorrect', 401));
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  res.json(ApiResponse.success(null, 'Password updated successfully'));
+});
+
 // @desc    Get all users (admin only)
 // @route   GET /api/v1/users
 // @access  Private/Admin

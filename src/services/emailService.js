@@ -34,6 +34,37 @@ class EmailService {
     }
   }
 
+  async sendEmailVerification(user, verificationUrl) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #6366f1;">Verify Your Email</h1>
+        <p>Hi ${user.name},</p>
+        <p>Thank you for registering with Festivo! Please verify your email address by clicking the button below:</p>
+        <a href="${verificationUrl}"
+           style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+          Verify Email
+        </a>
+        <p style="color: #666;">This link will expire in 24 hours.</p>
+        <p>If you didn't create an account with Festivo, please ignore this email.</p>
+        <p style="margin-top: 24px; color: #666;">
+          Best regards,<br>
+          The Festivo Team
+        </p>
+        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+        <p style="color: #999; font-size: 12px;">
+          If the button doesn't work, copy and paste this link into your browser:<br>
+          <a href="${verificationUrl}" style="color: #6366f1;">${verificationUrl}</a>
+        </p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: user.email,
+      subject: 'Verify Your Email - Festivo',
+      html
+    });
+  }
+
   async sendWelcomeEmail(user) {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

@@ -25,10 +25,10 @@ class ApiResponse {
   /**
    * Error response
    * @param {string} message - Error message
-   * @param {string} code - Error code
-   * @param {array} errors - Validation errors array
+   * @param {string|number} code - Error code
+   * @param {object} data - Additional data to include in response
    */
-  static error(message, code = 'ERROR', errors = null) {
+  static error(message, code = 'ERROR', data = null) {
     const response = {
       success: false,
       error: {
@@ -37,8 +37,8 @@ class ApiResponse {
       }
     };
 
-    if (errors) {
-      response.error.errors = errors;
+    if (data) {
+      response.data = data;
     }
 
     return response;

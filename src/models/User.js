@@ -115,6 +115,17 @@ const userSchema = new mongoose.Schema({
   passwordResetToken: String,
   passwordResetExpires: Date,
 
+  // Email Verification
+  emailVerificationToken: String,
+  emailVerificationExpires: Date,
+
+  // Phone Verification (OTP)
+  phoneOTP: {
+    type: String,
+    select: false
+  },
+  phoneOTPExpires: Date,
+
   // Preferences
   notifications: {
     email: { type: Boolean, default: true },
