@@ -102,12 +102,16 @@ exports.getEventBySlug = catchAsync(async (req, res, next) => {
 exports.createEvent = catchAsync(async (req, res, next) => {
   const eventData = {
     ...req.body,
-    organizer: req.user._id,
-    location: {
+    organizer: req.user._id
+  };
+
+  // Only set location if coordinates are provided
+  if (req.body.coordinates && req.body.coordinates.length === 2) {
+    eventData.location = {
       type: 'Point',
       coordinates: req.body.coordinates // [lng, lat]
-    }
-  };
+    };
+  }
 
   const event = await Event.create(eventData);
 

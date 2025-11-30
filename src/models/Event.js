@@ -50,16 +50,14 @@ const eventSchema = new mongoose.Schema({
     default: 'Asia/Kolkata'
   },
 
-  // Location
+  // Location (GeoJSON - optional, for nearby search functionality)
   location: {
     type: {
       type: String,
-      enum: ['Point'],
-      default: 'Point'
+      enum: ['Point']
     },
     coordinates: {
-      type: [Number],
-      required: true
+      type: [Number]
     }
   },
   locationName: {
@@ -187,7 +185,7 @@ eventSchema.index({ organizer: 1 });
 eventSchema.index({ date: 1 });
 eventSchema.index({ isPublic: 1, status: 1 });
 eventSchema.index({ city: 1 });
-eventSchema.index({ location: '2dsphere' });
+eventSchema.index({ location: '2dsphere' }, { sparse: true });
 eventSchema.index({ tags: 1 });
 eventSchema.index({ eventType: 1 });
 eventSchema.index({ title: 'text', description: 'text' });

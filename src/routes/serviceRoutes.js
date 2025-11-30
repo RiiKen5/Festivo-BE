@@ -11,13 +11,15 @@ router.get('/top-rated', cache(300), serviceController.getTopRatedServices);
 router.get('/nearby', serviceController.getNearbyServices);
 router.get('/category/:category', cache(300), paginationValidations, validate, serviceController.getServicesByCategory);
 router.get('/slug/:slug', cache(60), serviceController.getServiceBySlug);
+
+// Protected route - must be before /:id to avoid matching "my-services" as an id
+router.get('/my-services', protect, serviceController.getMyServices);
+
 router.get('/:id', paramValidations.mongoId, validate, serviceController.getService);
 router.get('/:id/check-availability', paramValidations.mongoId, validate, serviceController.checkAvailability);
 
 // Protected routes
 router.use(protect);
-
-router.get('/my-services', serviceController.getMyServices);
 
 router.post(
   '/',

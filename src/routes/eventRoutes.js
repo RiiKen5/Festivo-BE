@@ -11,12 +11,14 @@ router.get('/upcoming', cache(300), eventController.getUpcomingEvents);
 router.get('/popular', cache(300), eventController.getPopularEvents);
 router.get('/nearby', eventController.getNearbyEvents);
 router.get('/slug/:slug', cache(60), eventController.getEventBySlug);
+
+// Protected route - must be before /:id to avoid matching "my-events" as an id
+router.get('/my-events', protect, eventController.getMyEvents);
+
 router.get('/:id', paramValidations.mongoId, validate, eventController.getEvent);
 
 // Protected routes
 router.use(protect);
-
-router.get('/my-events', eventController.getMyEvents);
 
 router.post(
   '/',

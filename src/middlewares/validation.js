@@ -109,6 +109,7 @@ const eventValidations = {
       .notEmpty()
       .withMessage('City is required'),
     body('coordinates')
+      .optional()
       .isArray({ min: 2, max: 2 })
       .withMessage('Coordinates must be [longitude, latitude]'),
     body('expectedGuests')
