@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: festivo-backend
+    runtime: node
+    region: singapore  # Closest to India
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGODB_URI
+        sync: false  # You'll set this manually in dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: REDIS_ENABLED
+        value: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_SECRET
+        generateValue: true
