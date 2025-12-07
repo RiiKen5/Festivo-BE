@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
@@ -7,6 +8,9 @@ const ApiResponse = require('../utils/apiResponse');
 const { hashToken } = require('../utils/helpers');
 const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
+
+// Initialize Google OAuth client
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
@@ -602,6 +606,157 @@ exports.registerAdmin = catchAsync(async (req, res, next) => {
         tokens: { accessToken, refreshToken }
       },
       'Admin registered successfully'
+    )
+  );
+});
+
+// @desc    Google OAuth login/register
+// @route   POST /api/v1/auth/google
+// @access  Public
+exports.googleAuth = catchAsync(async (req, res, next) => {
+  const { credential, idToken, accessToken, token: bodyToken } = req.body;
+
+  // Support multiple token field names from different Google Sign-In implementations
+  const token = credential || idToken || accessToken || bodyToken;
+
+  if (!token) {
+    return next(new ApiError('Google credential is required', 400));
+  }
+
+  console.log('Google Auth attempt - Token length:', token?.length);
+  console.log('Token starts with ya29:', token?.startsWith('ya29.'));
+
+  let payload;
+
+  // Check if it's an access token (starts with ya29.) or ID token (JWT format)
+  const isAccessToken = token.startsWith('ya29.');
+
+  if (isAccessToken) {
+    // Use access token to get user info from Google
+    console.log('Using access token to fetch user info...');
+    try {
+      const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Google userinfo API error:', errorText);
+        return next(new ApiError('Invalid Google access token', 401));
+      }
+
+      payload = await response.json();
+      console.log('Got user info from access token:', payload.email);
+    } catch (fetchError) {
+      console.error('Failed to fetch user info:', fetchError.message);
+      return next(new ApiError('Failed to verify Google token', 401));
+    }
+  } else {
+    // It's an ID token - verify with Google
+    console.log('Verifying ID token...');
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID
+      });
+      payload = ticket.getPayload();
+    } catch (error) {
+      console.error('Google ID token verification failed:', error.message);
+      return next(new ApiError('Invalid Google credential', 401));
+    }
+  }
+
+  const { email, name, picture, sub: googleId } = payload;
+
+  if (!email) {
+    return next(new ApiError('Email not provided by Google', 400));
+  }
+
+  // Check if user exists with this email
+  let user = await User.findOne({ email }).select('+refreshTokens');
+  let isNewUser = false;
+
+  if (user) {
+    // Existing user - update Google ID if not set
+    if (!user.googleId) {
+      user.googleId = googleId;
+    }
+
+    // Update profile photo if not set
+    if (!user.profilePhoto && picture) {
+      user.profilePhoto = picture;
+    }
+
+    // Check if account is active
+    if (!user.isActive) {
+      return next(new ApiError('Your account has been deactivated', 403));
+    }
+
+    if (user.isBanned) {
+      return next(new ApiError('Your account has been banned', 403));
+    }
+  } else {
+    // New user - create account
+    isNewUser = true;
+
+    user = await User.create({
+      email,
+      name,
+      googleId,
+      profilePhoto: picture,
+      emailVerified: true, // Google accounts are verified
+      phoneVerified: false,
+      userType: 'all',
+      city: 'Not Set', // User can update later
+      // Generate a random password for Google users (they won't use it)
+      password: crypto.randomBytes(32).toString('hex')
+    });
+
+    // Reload to get refreshTokens field
+    user = await User.findById(user._id).select('+refreshTokens');
+
+    // Send welcome email
+    try {
+      await emailService.sendWelcomeEmail(user);
+    } catch (error) {
+      console.error('Failed to send welcome email:', error.message);
+    }
+  }
+
+  // Generate tokens
+  const jwtAccessToken = user.generateAccessToken();
+  const refreshToken = user.generateRefreshToken();
+
+  // Store refresh token (limit to 5 devices)
+  if (!user.refreshTokens) user.refreshTokens = [];
+  if (user.refreshTokens.length >= 5) {
+    user.refreshTokens.shift();
+  }
+  user.refreshTokens.push(refreshToken);
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  // Remove sensitive fields from response
+  user.password = undefined;
+  user.refreshTokens = undefined;
+
+  // Build verification status
+  const verificationStatus = {
+    emailVerified: user.emailVerified,
+    phoneVerified: user.phoneVerified
+  };
+
+  res.status(isNewUser ? 201 : 200).json(
+    ApiResponse.success(
+      {
+        user,
+        tokens: { accessToken: jwtAccessToken, refreshToken },
+        verificationStatus,
+        isNewUser
+      },
+      isNewUser ? 'Account created successfully' : 'Login successful'
     )
   );
 });

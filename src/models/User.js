@@ -19,9 +19,14 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
     unique: true,
+    sparse: true, // Allows multiple null values
     trim: true
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows multiple null values
   },
   name: {
     type: String,

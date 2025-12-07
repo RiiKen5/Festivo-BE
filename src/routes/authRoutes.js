@@ -46,6 +46,9 @@ router.post(
   authController.registerAdmin
 );
 
+// Google OAuth
+router.post('/google', authLimiter, authController.googleAuth);
+
 // Email verification (public - user clicks link from email)
 router.post('/verify-email', authController.verifyEmail);
 
