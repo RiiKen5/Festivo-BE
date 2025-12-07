@@ -19,6 +19,7 @@ router.post(
   rsvpController.createRSVP
 );
 
+router.put('/:id', paramValidations.mongoId, validate, rsvpController.updateRSVP);
 router.delete('/:id', paramValidations.mongoId, validate, rsvpController.cancelRSVP);
 
 router.post('/:id/check-in', paramValidations.mongoId, validate, rsvpController.checkInAttendee);

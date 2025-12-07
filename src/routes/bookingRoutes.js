@@ -28,5 +28,6 @@ router.post('/:id/confirm', paramValidations.mongoId, validate, bookingControlle
 router.post('/:id/cancel', paramValidations.mongoId, validate, bookingController.cancelBooking);
 router.post('/:id/complete', paramValidations.mongoId, validate, bookingController.completeBooking);
 router.post('/:id/payment', paramValidations.mongoId, validate, bookingController.updatePayment);
+router.put('/:id/payment', paramValidations.mongoId, validate, bookingController.recordPayment);
 
 module.exports = router;

@@ -30,6 +30,23 @@ exports.getServiceReviews = catchAsync(async (req, res, next) => {
   );
 });
 
+// @desc    Get single review
+// @route   GET /api/v1/reviews/:id
+// @access  Public
+exports.getReview = catchAsync(async (req, res, next) => {
+  const review = await Review.findById(req.params.id)
+    .populate('reviewer', 'name profilePhoto')
+    .populate('service', 'serviceName category coverImage')
+    .populate('vendor', 'name profilePhoto')
+    .populate('event', 'title eventType');
+
+  if (!review) {
+    return next(new ApiError('Review not found', 404));
+  }
+
+  res.json(ApiResponse.success(review, 'Review retrieved successfully'));
+});
+
 // @desc    Get reviews for a vendor
 // @route   GET /api/v1/reviews/vendor/:vendorId
 // @access  Public
@@ -265,6 +282,52 @@ exports.flagReview = catchAsync(async (req, res, next) => {
   // TODO: Notify admin about flagged review
 
   res.json(ApiResponse.success(null, 'Review flagged for moderation'));
+});
+
+// @desc    Report review
+// @route   POST /api/v1/reviews/:id/report
+// @access  Private
+exports.reportReview = catchAsync(async (req, res, next) => {
+  const { reason } = req.body;
+
+  if (!reason) {
+    return next(new ApiError('Report reason is required', 400));
+  }
+
+  const review = await Review.findById(req.params.id);
+
+  if (!review) {
+    return next(new ApiError('Review not found', 404));
+  }
+
+  // Check if user already reported this review
+  const alreadyReported = review.reports && review.reports.some(
+    report => report.reportedBy.toString() === req.user._id.toString()
+  );
+
+  if (alreadyReported) {
+    return next(new ApiError('You have already reported this review', 400));
+  }
+
+  // Add report
+  if (!review.reports) review.reports = [];
+  review.reports.push({
+    reportedBy: req.user._id,
+    reason,
+    createdAt: new Date()
+  });
+
+  // Auto-flag if multiple reports
+  if (review.reports.length >= 3) {
+    review.isFlagged = true;
+    review.flagReason = 'Multiple user reports';
+  }
+
+  await review.save();
+
+  // TODO: Notify admin about reported review
+
+  res.json(ApiResponse.success(null, 'Review reported successfully'));
 });
 
 // @desc    Get my reviews

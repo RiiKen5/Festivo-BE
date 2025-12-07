@@ -298,11 +298,11 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
   res.json(ApiResponse.success(booking, 'Booking completed successfully'));
 });
 
-// @desc    Update payment status
+// @desc    Update payment status (organizer)
 // @route   POST /api/v1/bookings/:id/payment
 // @access  Private
 exports.updatePayment = catchAsync(async (req, res, next) => {
-  const { amount, paymentMethod, transactionId } = req.body;
+  const { amount, paymentMethod, transactionId, notes } = req.body;
   const booking = await Booking.findById(req.params.id);
 
   if (!booking) {
@@ -314,14 +314,26 @@ exports.updatePayment = catchAsync(async (req, res, next) => {
     return next(new ApiError('Only organizer can update payment', 403));
   }
 
-  booking.pricePaid += amount;
+  // Add payment record to payments array
+  if (!booking.payments) booking.payments = [];
+  booking.payments.push({
+    amount,
+    paymentMethod,
+    transactionId,
+    paidAt: new Date(),
+    notes
+  });
+
+  // Calculate total paid from payments array
+  booking.totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0);
+  booking.pricePaid = booking.totalPaid;
   booking.paymentMethod = paymentMethod;
   if (transactionId) booking.transactionId = transactionId;
 
   // Update payment status
-  if (booking.pricePaid >= booking.priceAgreed) {
+  if (booking.totalPaid >= booking.priceAgreed) {
     booking.paymentStatus = 'paid';
-  } else if (booking.pricePaid > 0) {
+  } else if (booking.totalPaid > 0) {
     booking.paymentStatus = 'partial';
   }
 
@@ -338,6 +350,63 @@ exports.updatePayment = catchAsync(async (req, res, next) => {
   });
 
   res.json(ApiResponse.success(booking, 'Payment updated successfully'));
+});
+
+// @desc    Record payment (vendor)
+// @route   PUT /api/v1/bookings/:id/record-payment
+// @access  Private (Vendor only)
+exports.recordPayment = catchAsync(async (req, res, next) => {
+  const { amount, paymentMethod, transactionId, notes } = req.body;
+
+  if (!amount || amount <= 0) {
+    return next(new ApiError('Valid payment amount is required', 400));
+  }
+
+  const booking = await Booking.findById(req.params.id).populate('service');
+
+  if (!booking) {
+    return next(new ApiError('Booking not found', 404));
+  }
+
+  // Verify vendor owns the service
+  if (booking.vendor.toString() !== req.user._id.toString()) {
+    return next(new ApiError('Not authorized - only the vendor can record payments', 403));
+  }
+
+  // Add payment record to payments array
+  if (!booking.payments) booking.payments = [];
+  booking.payments.push({
+    amount,
+    paymentMethod: paymentMethod || 'other',
+    transactionId,
+    paidAt: new Date(),
+    notes
+  });
+
+  // Calculate total paid from payments array
+  booking.totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0);
+  booking.pricePaid = booking.totalPaid;
+
+  // Update payment status
+  if (booking.totalPaid >= booking.priceAgreed) {
+    booking.paymentStatus = 'paid';
+  } else if (booking.totalPaid > 0) {
+    booking.paymentStatus = 'partial';
+  }
+
+  await booking.save();
+
+  // Notify organizer
+  await Notification.createNotification({
+    recipient: booking.organizer,
+    type: 'payment',
+    title: 'Payment Recorded',
+    message: `Vendor recorded a payment of ₹${amount} for your booking`,
+    relatedBooking: booking._id,
+    actionUrl: `/bookings/${booking._id}`
+  });
+
+  res.json(ApiResponse.success(booking, 'Payment recorded successfully'));
 });
 
 // @desc    Get bookings for event

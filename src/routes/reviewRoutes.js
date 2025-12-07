@@ -8,6 +8,7 @@ const { validate, reviewValidations, paramValidations, paginationValidations } =
 router.get('/service/:serviceId', paginationValidations, validate, reviewController.getServiceReviews);
 router.get('/service/:serviceId/stats', reviewController.getServiceReviewStats);
 router.get('/vendor/:vendorId', paginationValidations, validate, reviewController.getVendorReviews);
+router.get('/:id', paramValidations.mongoId, validate, reviewController.getReview);
 
 // Protected routes
 router.use(protect);
@@ -28,6 +29,7 @@ router.post('/:id/respond', paramValidations.mongoId, validate, reviewController
 router.post('/:id/helpful', paramValidations.mongoId, validate, reviewController.markHelpful);
 router.delete('/:id/helpful', paramValidations.mongoId, validate, reviewController.removeHelpful);
 router.post('/:id/flag', paramValidations.mongoId, validate, reviewController.flagReview);
+router.post('/:id/report', paramValidations.mongoId, validate, reviewController.reportReview);
 
 // Admin routes
 router.put('/:id/moderate', restrictTo('admin'), paramValidations.mongoId, validate, reviewController.moderateReview);

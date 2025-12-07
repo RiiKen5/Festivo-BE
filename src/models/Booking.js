@@ -51,6 +51,11 @@ const bookingSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  totalPaid: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   paymentStatus: {
     type: String,
     enum: ['unpaid', 'partial', 'paid', 'refunded'],
@@ -58,12 +63,30 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'upi', 'card', 'netbanking']
+    enum: ['cash', 'upi', 'card', 'netbanking', 'bank_transfer', 'other']
   },
   transactionId: String,
   razorpayOrderId: String,
   razorpayPaymentId: String,
   razorpaySignature: String,
+
+  // Payment History
+  payments: [{
+    amount: {
+      type: Number,
+      required: true
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['cash', 'upi', 'bank_transfer', 'card', 'netbanking', 'other']
+    },
+    transactionId: String,
+    paidAt: {
+      type: Date,
+      default: Date.now
+    },
+    notes: String
+  }],
 
   // Details
   notes: String,

@@ -79,6 +79,22 @@ const reviewSchema = new mongoose.Schema({
   helpfulVoters: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+
+  // Reports
+  reports: [{
+    reportedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    reason: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
   }]
 }, {
   timestamps: true

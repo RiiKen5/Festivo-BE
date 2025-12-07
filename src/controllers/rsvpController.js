@@ -117,6 +117,55 @@ exports.getMyRSVP = catchAsync(async (req, res, next) => {
   res.json(ApiResponse.success(rsvp, 'RSVP retrieved'));
 });
 
+// @desc    Update RSVP
+// @route   PUT /api/v1/rsvps/:id
+// @access  Private
+exports.updateRSVP = catchAsync(async (req, res, next) => {
+  const { status, guestsCount } = req.body;
+
+  let rsvp = await RSVP.findById(req.params.id);
+
+  if (!rsvp) {
+    return next(new ApiError('RSVP not found', 404));
+  }
+
+  if (rsvp.attendee.toString() !== req.user._id.toString()) {
+    return next(new ApiError('Not authorized to update this RSVP', 403));
+  }
+
+  // Track changes for event attendee count
+  const event = await Event.findById(rsvp.event);
+  if (!event) {
+    return next(new ApiError('Event not found', 404));
+  }
+
+  const oldTotal = rsvp.status === 'going' ? 1 + (rsvp.guestsCount || 0) : 0;
+  const newTotal = status === 'going' ? 1 + (guestsCount || 0) : 0;
+  const diff = newTotal - oldTotal;
+
+  // Check capacity if increasing attendees
+  if (diff > 0 && event.maxAttendees) {
+    if (event.currentAttendees + diff > event.maxAttendees) {
+      return next(new ApiError('Event is at full capacity', 400));
+    }
+  }
+
+  // Update RSVP
+  if (status) rsvp.status = status;
+  if (guestsCount !== undefined) rsvp.guestsCount = guestsCount;
+  await rsvp.save();
+
+  // Update event attendee count
+  if (diff !== 0) {
+    event.currentAttendees = Math.max(0, event.currentAttendees + diff);
+    await event.save();
+  }
+
+  await rsvp.populate('attendee', 'name profilePhoto');
+
+  res.json(ApiResponse.success(rsvp, 'RSVP updated successfully'));
+});
+
 // @desc    Cancel RSVP
 // @route   DELETE /api/v1/rsvps/:id
 // @access  Private
