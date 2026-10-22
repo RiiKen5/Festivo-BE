@@ -58,7 +58,7 @@ app.use(compression());
 // Logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
-} else {
+} else if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('combined'));
 }
 

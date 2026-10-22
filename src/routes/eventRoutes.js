@@ -10,12 +10,13 @@ router.get('/', optionalAuth, cache(300), paginationValidations, validate, event
 router.get('/upcoming', cache(300), eventController.getUpcomingEvents);
 router.get('/popular', cache(300), eventController.getPopularEvents);
 router.get('/nearby', eventController.getNearbyEvents);
-router.get('/slug/:slug', cache(60), eventController.getEventBySlug);
+// Not cached: visibility depends on the viewer and their invite code
+router.get('/slug/:slug', optionalAuth, eventController.getEventBySlug);
 
 // Protected route - must be before /:id to avoid matching "my-events" as an id
 router.get('/my-events', protect, eventController.getMyEvents);
 
-router.get('/:id', paramValidations.mongoId, validate, eventController.getEvent);
+router.get('/:id', optionalAuth, paramValidations.mongoId, validate, eventController.getEvent);
 
 // Protected routes
 router.use(protect);
@@ -41,6 +42,9 @@ router.post('/:id/publish', paramValidations.mongoId, validate, eventController.
 router.post('/:id/unpublish', paramValidations.mongoId, validate, eventController.unpublishEvent);
 router.post('/:id/cancel', paramValidations.mongoId, validate, eventController.cancelEvent);
 router.post('/:id/complete', paramValidations.mongoId, validate, eventController.completeEvent);
+
+router.get('/:id/invite', paramValidations.mongoId, validate, eventController.getInvite);
+router.post('/:id/invite/regenerate', paramValidations.mongoId, validate, eventController.regenerateInvite);
 
 router.post('/:id/co-organizers', paramValidations.mongoId, validate, eventController.addCoOrganizer);
 router.delete('/:id/co-organizers/:userId', eventController.removeCoOrganizer);

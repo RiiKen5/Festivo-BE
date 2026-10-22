@@ -8,12 +8,13 @@ const { validate, reviewValidations, paramValidations, paginationValidations } =
 router.get('/service/:serviceId', paginationValidations, validate, reviewController.getServiceReviews);
 router.get('/service/:serviceId/stats', reviewController.getServiceReviewStats);
 router.get('/vendor/:vendorId', paginationValidations, validate, reviewController.getVendorReviews);
+
+// Must be before /:id so "my-reviews" isn't treated as an id
+router.get('/my-reviews', protect, paginationValidations, validate, reviewController.getMyReviews);
 router.get('/:id', paramValidations.mongoId, validate, reviewController.getReview);
 
 // Protected routes
 router.use(protect);
-
-router.get('/my-reviews', paginationValidations, validate, reviewController.getMyReviews);
 
 router.post(
   '/',

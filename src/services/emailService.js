@@ -16,6 +16,14 @@ class EmailService {
   }
 
   async sendEmail(options) {
+    // Without SMTP settings (local dev, tests) log instead of attempting delivery
+    if (!process.env.SMTP_HOST) {
+      if (process.env.NODE_ENV !== 'test') {
+        console.log(`[email not sent: SMTP not configured] to=${options.to} subject="${options.subject}"`);
+      }
+      return null;
+    }
+
     const mailOptions = {
       from: this.from,
       to: options.to,

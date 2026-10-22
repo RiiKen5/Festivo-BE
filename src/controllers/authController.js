@@ -5,7 +5,7 @@ const User = require('../models/User');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
-const { hashToken } = require('../utils/helpers');
+const { hashToken, safeEqual } = require('../utils/helpers');
 const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
 
@@ -304,9 +304,13 @@ exports.changePassword = catchAsync(async (req, res, next) => {
 exports.forgotPassword = catchAsync(async (req, res, next) => {
   const { email } = req.body;
 
+  // Same response whether or not the account exists, so this endpoint
+  // can't be used to discover registered emails
+  const genericMessage = 'If an account exists for that email, a password reset link has been sent';
+
   const user = await User.findOne({ email });
   if (!user) {
-    return next(new ApiError('No user found with that email', 404));
+    return res.json(ApiResponse.success(null, genericMessage));
   }
 
   // Generate reset token
@@ -319,13 +323,16 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   // Build reset URL
   const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
 
-  // TODO: Send email with resetUrl using emailService
-  // await emailService.sendPasswordReset(user.email, resetUrl);
+  try {
+    await emailService.sendPasswordResetEmail(user, resetUrl);
+  } catch (error) {
+    console.error('Failed to send password reset email:', error.message);
+  }
 
   res.json(
     ApiResponse.success(
-      { resetUrl }, // Remove this in production, only for development
-      'Password reset link sent to email'
+      process.env.NODE_ENV === 'development' ? { _dev: { resetUrl } } : null,
+      genericMessage
     )
   );
 });
@@ -569,8 +576,9 @@ exports.registerAdmin = catchAsync(async (req, res, next) => {
   const { email, password, phone, name, city, adminSecret } = req.body;
 
   // Verify admin secret key
-  const validSecret = process.env.ADMIN_SECRET || 'festivo-admin-secret-2024';
-  if (adminSecret !== validSecret) {
+  // Fail closed: with no ADMIN_SECRET configured, admin registration is disabled
+  const validSecret = process.env.ADMIN_SECRET;
+  if (!validSecret || !adminSecret || !safeEqual(adminSecret, validSecret)) {
     return next(new ApiError('Invalid admin secret key', 403));
   }
 

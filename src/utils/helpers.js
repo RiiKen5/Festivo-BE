@@ -19,6 +19,18 @@ exports.hashToken = (token) => {
 };
 
 /**
+ * Compare two strings in constant time
+ * @param {string} a - First string
+ * @param {string} b - Second string
+ * @returns {boolean} - True if equal
+ */
+exports.safeEqual = (a, b) => {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
+/**
  * Calculate pagination offset
  * @param {number} page - Current page
  * @param {number} limit - Items per page

@@ -1,9 +1,17 @@
-const rateLimit = require('express-rate-limit');
+const expressRateLimit = require('express-rate-limit');
+
+// Limits are disabled in the test suite, which makes many requests from one IP
+const rateLimit = (options) => expressRateLimit({
+  skip: () => process.env.NODE_ENV === 'test',
+  ...options
+});
 
 // General API limiter
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  // A single page view makes several API calls, and many users can share
+  // one IP (college Wi-Fi, mobile carrier NAT)
+  max: parseInt(process.env.API_RATE_LIMIT, 10) || 1000,
   message: {
     success: false,
     error: {
@@ -21,7 +29,7 @@ const apiLimiter = rateLimit({
 // Auth limiter (stricter)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 login attempts per windowMs
+  max: 10, // failed attempts per IP per window (successful ones aren't counted)
   message: {
     success: false,
     error: {

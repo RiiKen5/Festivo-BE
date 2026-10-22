@@ -162,7 +162,7 @@ const initializeSocket = (server) => {
 
 const getIO = () => {
   if (!io) {
-    console.warn('Socket.io not initialized');
+    if (process.env.NODE_ENV !== 'test') console.warn('Socket.io not initialized');
     return null;
   }
   return io;

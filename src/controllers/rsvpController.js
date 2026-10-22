@@ -5,6 +5,7 @@ const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
+const { canAccessEvent } = require('../utils/eventAccess');
 
 // @desc    Get RSVPs for an event
 // @route   GET /api/v1/rsvps/event/:eventId
@@ -48,58 +49,65 @@ exports.getEventRSVPs = catchAsync(async (req, res, next) => {
 // @route   POST /api/v1/rsvps
 // @access  Private
 exports.createRSVP = catchAsync(async (req, res, next) => {
-  const { eventId, status = 'going', guestsCount = 0 } = req.body;
+  const { eventId, status = 'going', guestsCount = 0, inviteCode } = req.body;
 
-  const event = await Event.findById(eventId);
-  if (!event) {
+  const event = await Event.findById(eventId).select('+inviteCode');
+  if (!event || !(await canAccessEvent(event, req.user, inviteCode))) {
     return next(new ApiError('Event not found', 404));
   }
 
-  // Check if event is public or user is invited
-  if (!event.isPublic) {
-    // TODO: Check if user is on invite list
+  if (['cancelled', 'completed'].includes(event.status) || new Date(event.date) < startOfToday()) {
+    return next(new ApiError('This event is no longer accepting RSVPs', 400));
   }
 
-  // Check if event has capacity
-  if (event.maxAttendees && event.currentAttendees + 1 + guestsCount > event.maxAttendees) {
-    return next(new ApiError('Event is at full capacity', 400));
-  }
-
-  // Check for existing RSVP
   let rsvp = await RSVP.findOne({ event: eventId, attendee: req.user._id });
 
+  // Capacity counts the attendee plus their guests, excluding any seats
+  // this attendee already holds
+  if (status === 'going' && event.maxAttendees) {
+    const alreadyHeld = rsvp && rsvp.status === 'going' ? 1 + (rsvp.guestsCount || 0) : 0;
+    if (event.currentAttendees - alreadyHeld + 1 + guestsCount > event.maxAttendees) {
+      return next(new ApiError('Event is at full capacity', 400));
+    }
+  }
+
+  const isNew = !rsvp;
   if (rsvp) {
-    // Update existing RSVP
     rsvp.status = status;
     rsvp.guestsCount = guestsCount;
     await rsvp.save();
   } else {
-    // Create new RSVP
     rsvp = await RSVP.create({
       event: eventId,
       attendee: req.user._id,
       status,
       guestsCount
     });
+  }
 
-    // Notify organizer
-    if (status === 'going') {
-      await Notification.createNotification({
-        recipient: event.organizer,
-        type: 'rsvp',
-        title: 'New RSVP',
-        message: `${req.user.name} is coming to your event "${event.title}"`,
-        relatedEvent: eventId,
-        relatedUser: req.user._id,
-        actionUrl: `/events/${eventId}/rsvps`
-      });
-    }
+  // Notify organizer
+  if (isNew && status === 'going') {
+    await Notification.createNotification({
+      recipient: event.organizer,
+      type: 'rsvp',
+      title: 'New RSVP',
+      message: `${req.user.name} is coming to your event "${event.title}"`,
+      relatedEvent: eventId,
+      relatedUser: req.user._id,
+      actionUrl: `/events/${eventId}`
+    });
   }
 
   await rsvp.populate('attendee', 'name profilePhoto');
 
-  res.status(201).json(ApiResponse.success(rsvp, 'RSVP saved successfully'));
+  res.status(isNew ? 201 : 200).json(ApiResponse.success(rsvp, 'RSVP saved successfully'));
 });
+
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 
 // @desc    Get my RSVP for event
 // @route   GET /api/v1/rsvps/event/:eventId/my-rsvp
@@ -133,33 +141,26 @@ exports.updateRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized to update this RSVP', 403));
   }
 
-  // Track changes for event attendee count
   const event = await Event.findById(rsvp.event);
   if (!event) {
     return next(new ApiError('Event not found', 404));
   }
 
+  const nextStatus = status || rsvp.status;
+  const nextGuests = guestsCount !== undefined ? guestsCount : rsvp.guestsCount;
   const oldTotal = rsvp.status === 'going' ? 1 + (rsvp.guestsCount || 0) : 0;
-  const newTotal = status === 'going' ? 1 + (guestsCount || 0) : 0;
-  const diff = newTotal - oldTotal;
+  const newTotal = nextStatus === 'going' ? 1 + (nextGuests || 0) : 0;
 
   // Check capacity if increasing attendees
-  if (diff > 0 && event.maxAttendees) {
-    if (event.currentAttendees + diff > event.maxAttendees) {
-      return next(new ApiError('Event is at full capacity', 400));
-    }
+  if (newTotal > oldTotal && event.maxAttendees &&
+      event.currentAttendees - oldTotal + newTotal > event.maxAttendees) {
+    return next(new ApiError('Event is at full capacity', 400));
   }
 
-  // Update RSVP
-  if (status) rsvp.status = status;
-  if (guestsCount !== undefined) rsvp.guestsCount = guestsCount;
+  // Event counts are recalculated by the RSVP save hook
+  rsvp.status = nextStatus;
+  rsvp.guestsCount = nextGuests;
   await rsvp.save();
-
-  // Update event attendee count
-  if (diff !== 0) {
-    event.currentAttendees = Math.max(0, event.currentAttendees + diff);
-    await event.save();
-  }
 
   await rsvp.populate('attendee', 'name profilePhoto');
 

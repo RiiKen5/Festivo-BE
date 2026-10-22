@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const mongoose = require('mongoose');
 const slugify = require('slugify');
 
@@ -108,6 +109,11 @@ const eventSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Secret shared in invite links; grants access to private events
+  inviteCode: {
+    type: String,
+    select: false
+  },
   status: {
     type: String,
     enum: ['draft', 'planning', 'active', 'completed', 'cancelled'],
@@ -199,6 +205,14 @@ eventSchema.pre('save', function(next) {
   next();
 });
 
+// Generate invite code for new events
+eventSchema.pre('save', function(next) {
+  if (this.isNew && !this.inviteCode) {
+    this.inviteCode = crypto.randomBytes(9).toString('base64url');
+  }
+  next();
+});
+
 // Auto-update status if date is set
 eventSchema.pre('save', function(next) {
   if (this.isModified('date') && this.status === 'draft') {
@@ -206,6 +220,20 @@ eventSchema.pre('save', function(next) {
   }
   next();
 });
+
+// Whether a user organizes this event (owner or co-organizer)
+eventSchema.methods.isOrganizedBy = function(user) {
+  if (!user) return false;
+  const userId = user._id.toString();
+  const organizerId = (this.organizer._id || this.organizer).toString();
+  return organizerId === userId ||
+    (this.coOrganizers || []).some(c => (c._id || c).toString() === userId);
+};
+
+// Whether this event is listed for everyone to see and join
+eventSchema.methods.isOpenToPublic = function() {
+  return this.isPublic && this.isPublished && this.status !== 'cancelled';
+};
 
 // Virtual for days until event
 eventSchema.virtual('daysUntilEvent').get(function() {

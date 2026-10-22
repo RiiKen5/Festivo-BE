@@ -4,6 +4,16 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 const { clearCache } = require('../middlewares/cache');
+const { filterObject } = require('../utils/helpers');
+const { canAccessEvent, serializeEvent } = require('../utils/eventAccess');
+
+// Fields an organizer may change via PUT /events/:id
+const UPDATABLE_EVENT_FIELDS = [
+  'title', 'description', 'eventType', 'date', 'time', 'endDate', 'timezone',
+  'locationName', 'address', 'city', 'expectedGuests', 'maxAttendees',
+  'budget', 'isPublic', 'entryFee', 'isPaid', 'coverPhoto', 'photos',
+  'tags', 'category', 'vibeScore', 'metaTitle', 'metaDescription'
+];
 
 // @desc    Get all events with filters
 // @route   GET /api/v1/events
@@ -24,7 +34,7 @@ exports.getEvents = catchAsync(async (req, res, next) => {
   } = req.query;
 
   // Build query
-  const query = { isPublished: true, status: { $ne: 'cancelled' } };
+  const query = { isPublic: true, isPublished: true, status: { $ne: 'cancelled' } };
 
   if (city) query.city = city;
   if (eventType) query.eventType = eventType;
@@ -63,37 +73,35 @@ exports.getEvents = catchAsync(async (req, res, next) => {
 // @access  Public
 exports.getEvent = catchAsync(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
+    .select('+inviteCode')
     .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings')
     .populate('coOrganizers', 'name profilePhoto');
 
-  if (!event) {
+  await sendEventIfAccessible(event, req, res, next);
+});
+
+// Shared by getEvent and getEventBySlug. Inaccessible events are reported
+// as not found so private events can't be discovered by guessing IDs.
+const sendEventIfAccessible = async (event, req, res, next) => {
+  if (!event || !(await canAccessEvent(event, req.user, req.query.invite))) {
     return next(new ApiError('Event not found', 404));
   }
 
-  // Increment views
-  event.views += 1;
-  await event.save();
+  await Event.updateOne({ _id: event._id }, { $inc: { views: 1 } });
 
-  res.json(ApiResponse.success(event, 'Event retrieved successfully'));
-});
+  res.json(ApiResponse.success(serializeEvent(event, req.user), 'Event retrieved successfully'));
+};
 
 // @desc    Get event by slug
 // @route   GET /api/v1/events/slug/:slug
 // @access  Public
 exports.getEventBySlug = catchAsync(async (req, res, next) => {
   const event = await Event.findOne({ slug: req.params.slug })
+    .select('+inviteCode')
     .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings')
     .populate('coOrganizers', 'name profilePhoto');
 
-  if (!event) {
-    return next(new ApiError('Event not found', 404));
-  }
-
-  // Increment views
-  event.views += 1;
-  await event.save();
-
-  res.json(ApiResponse.success(event, 'Event retrieved successfully'));
+  await sendEventIfAccessible(event, req, res, next);
 });
 
 // @desc    Create event
@@ -101,7 +109,7 @@ exports.getEventBySlug = catchAsync(async (req, res, next) => {
 // @access  Private
 exports.createEvent = catchAsync(async (req, res, next) => {
   const eventData = {
-    ...req.body,
+    ...filterObject(req.body, UPDATABLE_EVENT_FIELDS),
     organizer: req.user._id
   };
 
@@ -154,7 +162,10 @@ exports.updateEvent = catchAsync(async (req, res, next) => {
     };
   }
 
-  event = await Event.findByIdAndUpdate(req.params.id, req.body, {
+  const updates = filterObject(req.body, UPDATABLE_EVENT_FIELDS);
+  if (req.body.location) updates.location = req.body.location;
+
+  event = await Event.findByIdAndUpdate(req.params.id, updates, {
     new: true,
     runValidators: true
   });
@@ -198,6 +209,7 @@ exports.getMyEvents = catchAsync(async (req, res, next) => {
   if (status) query.status = status;
 
   const events = await Event.find(query)
+    .select('+inviteCode')
     .sort('-createdAt')
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -330,6 +342,7 @@ exports.getNearbyEvents = catchAsync(async (req, res, next) => {
         $maxDistance: parseInt(maxDistance)
       }
     },
+    isPublic: true,
     isPublished: true,
     status: { $in: ['active', 'planning'] },
     date: { $gte: new Date() }
@@ -348,6 +361,7 @@ exports.getUpcomingEvents = catchAsync(async (req, res, next) => {
   const { city, limit = 10 } = req.query;
 
   const query = {
+    isPublic: true,
     isPublished: true,
     status: { $in: ['active', 'planning'] },
     date: { $gte: new Date() }
@@ -371,6 +385,7 @@ exports.getPopularEvents = catchAsync(async (req, res, next) => {
   const { city, limit = 10 } = req.query;
 
   const query = {
+    isPublic: true,
     isPublished: true,
     status: { $in: ['active', 'planning'] },
     date: { $gte: new Date() }
@@ -441,4 +456,46 @@ exports.removeCoOrganizer = catchAsync(async (req, res, next) => {
   await event.save();
 
   res.json(ApiResponse.success(event, 'Co-organizer removed successfully'));
+});
+
+// @desc    Get invite link details for an event
+// @route   GET /api/v1/events/:id/invite
+// @access  Private (organizers)
+exports.getInvite = catchAsync(async (req, res, next) => {
+  const event = await Event.findById(req.params.id).select('+inviteCode');
+
+  if (!event) {
+    return next(new ApiError('Event not found', 404));
+  }
+
+  if (!event.isOrganizedBy(req.user) && req.user.role !== 'admin') {
+    return next(new ApiError('Not authorized', 403));
+  }
+
+  res.json(ApiResponse.success(inviteDetails(event), 'Invite retrieved'));
+});
+
+// @desc    Replace an event's invite code, invalidating old invite links
+// @route   POST /api/v1/events/:id/invite/regenerate
+// @access  Private (owner)
+exports.regenerateInvite = catchAsync(async (req, res, next) => {
+  const event = await Event.findById(req.params.id).select('+inviteCode');
+
+  if (!event) {
+    return next(new ApiError('Event not found', 404));
+  }
+
+  if (event.organizer.toString() !== req.user._id.toString()) {
+    return next(new ApiError('Not authorized', 403));
+  }
+
+  event.inviteCode = require('crypto').randomBytes(9).toString('base64url');
+  await event.save();
+
+  res.json(ApiResponse.success(inviteDetails(event), 'Invite link regenerated'));
+});
+
+const inviteDetails = (event) => ({
+  inviteCode: event.inviteCode,
+  inviteUrl: `${process.env.FRONTEND_URL}/events/${event._id}?invite=${event.inviteCode}`
 });

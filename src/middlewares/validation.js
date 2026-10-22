@@ -233,7 +233,12 @@ const rsvpValidations = {
     body('status')
       .optional()
       .isIn(['going', 'maybe', 'not_going'])
-      .withMessage('Invalid status')
+      .withMessage('Invalid status'),
+    body('guestsCount')
+      .optional()
+      .isInt({ min: 0, max: 10 })
+      .withMessage('Guests must be between 0 and 10')
+      .toInt()
   ]
 };
 
