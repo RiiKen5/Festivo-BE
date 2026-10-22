@@ -24,3 +24,29 @@ services:
         sync: false
       - key: ADMIN_SECRET
         generateValue: true
+      # Set the values below in the Render dashboard
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: FROM_NAME
+        value: Festivo
+      # Online payments stay disabled until both keys are set
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: BOOKING_COMMISSION_PERCENT
+        value: 15
+      - key: TICKET_FEE_PERCENT
+        value: 5
