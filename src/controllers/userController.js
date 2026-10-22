@@ -41,6 +41,36 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   res.json(ApiResponse.success(user, 'Profile updated successfully'));
 });
 
+// @desc    Get my payout details
+// @route   GET /api/v1/users/me/payout-details
+// @access  Private
+exports.getPayoutDetails = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('+payoutDetails');
+  res.json(ApiResponse.success(user.payoutDetails || null, 'Payout details retrieved'));
+});
+
+// @desc    Set where my earnings are paid out (UPI or bank account)
+// @route   PUT /api/v1/users/me/payout-details
+// @access  Private
+exports.updatePayoutDetails = catchAsync(async (req, res, next) => {
+  const { method, upiId, accountHolderName, accountNumber, ifsc } = req.body;
+
+  let details;
+  if (method === 'upi' && upiId) {
+    details = { method, upiId };
+  } else if (method === 'bank' && accountHolderName && accountNumber && ifsc) {
+    details = { method, accountHolderName, accountNumber, ifsc };
+  } else {
+    return next(new ApiError('Provide a UPI ID, or account holder name, account number and IFSC', 400));
+  }
+
+  const user = await User.findById(req.user._id).select('+payoutDetails');
+  user.payoutDetails = { ...details, updatedAt: new Date() };
+  await user.save();
+
+  res.json(ApiResponse.success(user.payoutDetails, 'Payout details saved'));
+});
+
 // @desc    Update current user password
 // @route   PUT /api/v1/users/update-password
 // @access  Private

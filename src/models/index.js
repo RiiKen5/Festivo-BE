@@ -7,6 +7,7 @@ const RSVP = require('./RSVP');
 const Message = require('./Message');
 const Review = require('./Review');
 const Notification = require('./Notification');
+const Payment = require('./Payment');
 
 module.exports = {
   User,
@@ -17,5 +18,6 @@ module.exports = {
   RSVP,
   Message,
   Review,
-  Notification
+  Notification,
+  Payment
 };

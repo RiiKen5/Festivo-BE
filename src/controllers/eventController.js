@@ -6,6 +6,11 @@ const ApiResponse = require('../utils/apiResponse');
 const { clearCache } = require('../middlewares/cache');
 const { filterObject } = require('../utils/helpers');
 const { canAccessEvent, serializeEvent } = require('../utils/eventAccess');
+const Booking = require('../models/Booking');
+const RSVP = require('../models/RSVP');
+const Notification = require('../models/Notification');
+const checkoutService = require('../services/checkoutService');
+const bookingService = require('../services/bookingService');
 
 // Fields an organizer may change via PUT /events/:id
 const UPDATABLE_EVENT_FIELDS = [
@@ -283,15 +288,67 @@ exports.cancelEvent = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized', 403));
   }
 
+  if (event.status === 'cancelled') {
+    return next(new ApiError('Event is already cancelled', 400));
+  }
+
+  // Stop new RSVPs and bookings before unwinding existing ones
   event.status = 'cancelled';
   event.isPublished = false;
   await event.save();
 
-  // TODO: Notify all RSVPs and bookings about cancellation
+  const { reason } = req.body;
+  const failures = [];
+
+  // Vendor bookings are cancelled under the organizer cancellation policy
+  const bookings = await Booking.find({
+    event: event._id,
+    status: { $in: ['pending', 'confirmed', 'in_progress'] }
+  });
+  for (const booking of bookings) {
+    try {
+      await bookingService.cancelBooking(booking, req.user, reason || 'The event was cancelled');
+    } catch (error) {
+      console.error(`Failed to cancel booking ${booking._id}:`, error.message);
+      failures.push({ booking: booking._id, error: error.message });
+    }
+  }
+
+  // Attendees get tickets refunded in full
+  const rsvps = await RSVP.find({
+    event: event._id,
+    status: { $in: ['going', 'maybe', 'pending_payment'] }
+  });
+  for (const rsvp of rsvps) {
+    try {
+      const refunded = rsvp.paymentStatus === 'paid'
+        ? await checkoutService.refundTicket(rsvp, 1, 'Event cancelled by organizer')
+        : 0;
+      rsvp.status = 'cancelled';
+      await rsvp.save();
+
+      await Notification.createNotification({
+        recipient: rsvp.attendee,
+        type: 'event_reminder',
+        title: 'Event Cancelled',
+        message: `"${event.title}" has been cancelled.${refunded > 0 ? ` Your ₹${refunded} ticket is being refunded.` : ''}`,
+        relatedEvent: event._id,
+        actionUrl: `/events/${event._id}`
+      });
+    } catch (error) {
+      console.error(`Failed to cancel RSVP ${rsvp._id}:`, error.message);
+      failures.push({ rsvp: rsvp._id, error: error.message });
+    }
+  }
 
   await clearCache('/api/v1/events');
 
-  res.json(ApiResponse.success(event, 'Event cancelled successfully'));
+  res.json(ApiResponse.success(
+    { ...event.toJSON(), refundFailures: failures },
+    failures.length
+      ? 'Event cancelled, but some refunds failed. Our team will follow up.'
+      : 'Event cancelled successfully'
+  ));
 });
 
 // @desc    Complete event
@@ -316,6 +373,9 @@ exports.completeEvent = catchAsync(async (req, res, next) => {
   await User.findByIdAndUpdate(req.user._id, {
     $inc: { xpPoints: 100 }
   });
+
+  // Ticket revenue becomes due to the organizer
+  await checkoutService.releaseTicketPayouts(event._id);
 
   await clearCache('/api/v1/events');
 

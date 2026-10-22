@@ -47,7 +47,7 @@ const createRedisClient = () => {
 
   // Check if Redis should be disabled
   if (process.env.REDIS_ENABLED === 'false') {
-    console.log('Redis disabled by configuration, using mock client');
+    if (process.env.NODE_ENV !== 'test') console.log('Redis disabled by configuration, using mock client');
     redisClient = mockRedisClient;
     return redisClient;
   }

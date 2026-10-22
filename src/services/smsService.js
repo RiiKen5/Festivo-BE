@@ -9,7 +9,7 @@ class SMSService {
       );
       this.fromNumber = process.env.TWILIO_PHONE_NUMBER;
     } else {
-      console.warn('Twilio credentials not configured. SMS service will be disabled.');
+      if (process.env.NODE_ENV !== 'test') console.warn('Twilio credentials not configured. SMS service will be disabled.');
       this.client = null;
     }
   }

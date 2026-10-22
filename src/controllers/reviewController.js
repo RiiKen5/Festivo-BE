@@ -398,7 +398,8 @@ exports.moderateReview = catchAsync(async (req, res, next) => {
 
   const review = await Review.findByIdAndUpdate(
     req.params.id,
-    { isApproved, isFlagged: false },
+    // Moderation resolves the flag and outstanding reports either way
+    { isApproved, isFlagged: false, reports: [] },
     { new: true }
   );
 

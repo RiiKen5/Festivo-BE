@@ -12,6 +12,8 @@ const rsvpRoutes = require('./rsvpRoutes');
 const messageRoutes = require('./messageRoutes');
 const reviewRoutes = require('./reviewRoutes');
 const notificationRoutes = require('./notificationRoutes');
+const paymentRoutes = require('./paymentRoutes');
+const adminRoutes = require('./adminRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -24,6 +26,8 @@ router.use('/rsvps', rsvpRoutes);
 router.use('/messages', messageRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/admin', adminRoutes);
 
 // Health check
 router.get('/health', (req, res) => {
@@ -54,7 +58,8 @@ router.get('/health', (req, res) => {
       rsvps: '/api/v1/rsvps',
       messages: '/api/v1/messages',
       reviews: '/api/v1/reviews',
-      notifications: '/api/v1/notifications'
+      notifications: '/api/v1/notifications',
+      payments: '/api/v1/payments'
     }
   });
 });

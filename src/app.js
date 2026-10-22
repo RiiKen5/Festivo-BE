@@ -28,6 +28,14 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Razorpay webhook signatures are computed over the raw body, so this route
+// is registered before the JSON parser
+app.post(
+  '/api/v1/payments/webhook',
+  express.raw({ type: 'application/json', limit: '1mb' }),
+  require('./controllers/paymentController').handleWebhook
+);
+
 // Body parsers
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));

@@ -164,6 +164,12 @@ serviceSchema.pre('save', function(next) {
   next();
 });
 
+// Whether the vendor has blocked out the given day
+serviceSchema.methods.isBlackedOut = function(date) {
+  const day = new Date(date).toDateString();
+  return (this.blackoutDates || []).some(d => new Date(d).toDateString() === day);
+};
+
 // Calculate completion rate
 serviceSchema.virtual('completionRate').get(function() {
   if (this.totalBookings === 0) return 0;

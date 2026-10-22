@@ -77,8 +77,10 @@ rsvpSchema.index({ event: 1, checkInCode: 1 });
 
 // Recalculate event attendance: rsvpCount is confirmed RSVPs,
 // currentAttendees is the headcount including each RSVP's guests
-rsvpSchema.statics.syncEventCounts = async function(eventId) {
+rsvpSchema.statics.syncEventCounts = async function(eventRef) {
   const Event = mongoose.model('Event');
+  // Accept a populated event or an id; aggregate() doesn't cast for us
+  const eventId = new mongoose.Types.ObjectId(String(eventRef._id || eventRef));
 
   const [totals] = await this.aggregate([
     { $match: { event: eventId, status: 'going' } },

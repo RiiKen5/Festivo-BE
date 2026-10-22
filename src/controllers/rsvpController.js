@@ -6,6 +6,8 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 const { canAccessEvent } = require('../utils/eventAccess');
+const checkoutService = require('../services/checkoutService');
+const policies = require('../config/policies');
 
 // @desc    Get RSVPs for an event
 // @route   GET /api/v1/rsvps/event/:eventId
@@ -62,6 +64,11 @@ exports.createRSVP = catchAsync(async (req, res, next) => {
 
   let rsvp = await RSVP.findOne({ event: eventId, attendee: req.user._id });
 
+  const needsTicket = event.entryFee > 0 && status === 'going';
+  if (needsTicket && rsvp && rsvp.paymentStatus === 'paid' && rsvp.status === 'going') {
+    return next(new ApiError('You already have a ticket for this event', 400));
+  }
+
   // Capacity counts the attendee plus their guests, excluding any seats
   // this attendee already holds
   if (status === 'going' && event.maxAttendees) {
@@ -71,18 +78,29 @@ exports.createRSVP = catchAsync(async (req, res, next) => {
     }
   }
 
+  // Paid events: the seat is confirmed once the ticket payment succeeds
+  const savedStatus = needsTicket ? 'pending_payment' : status;
+
   const isNew = !rsvp;
   if (rsvp) {
-    rsvp.status = status;
+    rsvp.status = savedStatus;
     rsvp.guestsCount = guestsCount;
     await rsvp.save();
   } else {
     rsvp = await RSVP.create({
       event: eventId,
       attendee: req.user._id,
-      status,
+      status: savedStatus,
       guestsCount
     });
+  }
+
+  if (needsTicket) {
+    const checkout = await checkoutService.createTicketOrder(rsvp, event);
+    await rsvp.populate('attendee', 'name profilePhoto');
+    return res.status(isNew ? 201 : 200).json(
+      ApiResponse.success({ rsvp, checkout }, 'Complete payment to confirm your ticket')
+    );
   }
 
   // Notify organizer
@@ -148,6 +166,12 @@ exports.updateRSVP = catchAsync(async (req, res, next) => {
 
   const nextStatus = status || rsvp.status;
   const nextGuests = guestsCount !== undefined ? guestsCount : rsvp.guestsCount;
+
+  // Tickets cover a fixed number of people and are bought via POST /rsvps
+  if (event.entryFee > 0 &&
+      ((nextStatus === 'going' && rsvp.paymentStatus !== 'paid') || nextGuests !== rsvp.guestsCount)) {
+    return next(new ApiError('Ticketed RSVPs cannot be changed here. Cancel and buy a new ticket instead.', 400));
+  }
   const oldTotal = rsvp.status === 'going' ? 1 + (rsvp.guestsCount || 0) : 0;
   const newTotal = nextStatus === 'going' ? 1 + (nextGuests || 0) : 0;
 
@@ -181,10 +205,19 @@ exports.cancelRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized', 403));
   }
 
+  let refunded = 0;
+  if (rsvp.paymentStatus === 'paid') {
+    const event = await Event.findById(rsvp.event);
+    refunded = await checkoutService.refundTicket(rsvp, policies.ticketRefundShare(event), 'Attendee cancelled');
+  }
+
   rsvp.status = 'cancelled';
   await rsvp.save();
 
-  res.json(ApiResponse.success(null, 'RSVP cancelled successfully'));
+  res.json(ApiResponse.success(
+    { refundIssued: refunded },
+    refunded > 0 ? `RSVP cancelled. ₹${refunded} will be refunded.` : 'RSVP cancelled successfully'
+  ));
 });
 
 // @desc    Check in attendee
@@ -205,6 +238,10 @@ exports.checkInAttendee = catchAsync(async (req, res, next) => {
 
   if (!isAuthorized) {
     return next(new ApiError('Not authorized to check in attendees', 403));
+  }
+
+  if (rsvp.status !== 'going') {
+    return next(new ApiError('This RSVP is not confirmed', 400));
   }
 
   rsvp.checkedIn = true;
@@ -241,6 +278,10 @@ exports.checkInByCode = catchAsync(async (req, res, next) => {
 
   if (!rsvp) {
     return next(new ApiError('Invalid check-in code', 404));
+  }
+
+  if (rsvp.status !== 'going') {
+    return next(new ApiError('This RSVP is not confirmed', 400));
   }
 
   if (rsvp.checkedIn) {

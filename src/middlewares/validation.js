@@ -171,11 +171,14 @@ const bookingValidations = {
       .isMongoId()
       .withMessage('Invalid service ID'),
     body('eventDate')
+      .optional()
       .isISO8601()
       .withMessage('Please provide a valid event date'),
     body('priceAgreed')
+      .optional()
       .isFloat({ min: 0 })
       .withMessage('Price must be a positive number')
+      .toFloat()
   ]
 };
 

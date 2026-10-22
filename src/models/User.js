@@ -138,6 +138,19 @@ const userSchema = new mongoose.Schema({
     push: { type: Boolean, default: true }
   },
 
+  // Where the platform sends this user's vendor/ticket earnings
+  payoutDetails: {
+    type: new mongoose.Schema({
+      method: { type: String, enum: ['upi', 'bank'], required: true },
+      upiId: { type: String, trim: true, match: [/^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/, 'Invalid UPI ID'] },
+      accountHolderName: { type: String, trim: true },
+      accountNumber: { type: String, trim: true, match: [/^\d{9,18}$/, 'Invalid account number'] },
+      ifsc: { type: String, trim: true, uppercase: true, match: [/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'] },
+      updatedAt: Date
+    }, { _id: false }),
+    select: false
+  },
+
   // Social Links
   socialLinks: {
     instagram: String,

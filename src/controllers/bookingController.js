@@ -5,6 +5,8 @@ const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
+const checkoutService = require('../services/checkoutService');
+const bookingService = require('../services/bookingService');
 
 // @desc    Get all bookings (with filters)
 // @route   GET /api/v1/bookings
@@ -102,9 +104,22 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('You can only create bookings for your own events', 403));
   }
 
-  // Check if service is available
-  if (service.availability === 'not_taking_orders') {
-    return next(new ApiError('This service is not accepting bookings', 400));
+  if (service.provider.toString() === req.user._id.toString()) {
+    return next(new ApiError('You cannot book your own service', 400));
+  }
+
+  if (['cancelled', 'completed'].includes(event.status)) {
+    return next(new ApiError('Bookings can only be made for upcoming events', 400));
+  }
+
+  if (!service.isActive) {
+    return next(new ApiError('This service is no longer listed', 400));
+  }
+
+  // Check if service is available on the date
+  const bookingDate = new Date(eventDate || event.date);
+  if (service.availability !== 'available' || service.isBlackedOut(bookingDate)) {
+    return next(new ApiError('This service is not available on that date', 400));
   }
 
   // Check for existing booking
@@ -118,13 +133,18 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('A booking already exists for this service and event', 400));
   }
 
+  // The organizer's proposed price; the vendor can revise it when confirming
+  const proposedPrice = priceAgreed !== undefined
+    ? priceAgreed
+    : service.basePrice * (service.priceUnit === 'per_person' ? event.expectedGuests : 1);
+
   const booking = await Booking.create({
     event: eventId,
     service: serviceId,
     organizer: req.user._id,
     vendor: service.provider,
-    eventDate: eventDate || event.date,
-    priceAgreed,
+    eventDate: bookingDate,
+    priceAgreed: proposedPrice,
     notes,
     requirements
   });
@@ -199,6 +219,16 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('Booking is not pending', 400));
   }
 
+  // Vendor can confirm at a revised price (their quote)
+  const { priceAgreed } = req.body;
+  if (priceAgreed !== undefined) {
+    const quote = Number(priceAgreed);
+    if (!Number.isFinite(quote) || quote < booking.pricePaid || quote < 0) {
+      return next(new ApiError('Invalid price', 400));
+    }
+    booking.priceAgreed = quote;
+  }
+
   booking.status = 'confirmed';
   await booking.save();
 
@@ -207,7 +237,7 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
     recipient: booking.organizer,
     type: 'booking',
     title: 'Booking Confirmed',
-    message: 'Your booking has been confirmed by the vendor',
+    message: `Your booking has been confirmed by the vendor at ₹${booking.priceAgreed}. You can now pay securely online.`,
     relatedBooking: booking._id,
     actionUrl: `/bookings/${booking._id}`
   });
@@ -234,32 +264,16 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized', 403));
   }
 
-  // Can't cancel completed bookings
-  if (booking.status === 'completed') {
-    return next(new ApiError('Cannot cancel completed booking', 400));
+  if (['completed', 'cancelled', 'refunded'].includes(booking.status)) {
+    return next(new ApiError(`Cannot cancel a ${booking.status} booking`, 400));
   }
 
-  booking.status = 'cancelled';
-  booking.cancellationReason = reason;
-  booking.cancelledBy = req.user._id;
-  booking.cancelledAt = new Date();
-  await booking.save();
+  const refunded = await bookingService.cancelBooking(booking, req.user, reason);
 
-  // Notify the other party
-  const notifyUser = booking.organizer.toString() === req.user._id.toString()
-    ? booking.vendor
-    : booking.organizer;
-
-  await Notification.createNotification({
-    recipient: notifyUser,
-    type: 'booking',
-    title: 'Booking Cancelled',
-    message: `A booking has been cancelled. Reason: ${reason || 'No reason provided'}`,
-    relatedBooking: booking._id,
-    actionUrl: `/bookings/${booking._id}`
-  });
-
-  res.json(ApiResponse.success(booking, 'Booking cancelled successfully'));
+  res.json(ApiResponse.success(
+    { ...booking.toJSON(), refundIssued: refunded },
+    refunded > 0 ? `Booking cancelled. ₹${refunded} will be refunded.` : 'Booking cancelled successfully'
+  ));
 });
 
 // @desc    Complete booking
@@ -285,6 +299,8 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
   booking.completedAt = new Date();
   await booking.save();
 
+  await checkoutService.releaseBookingPayouts(booking._id);
+
   // Notify vendor
   await Notification.createNotification({
     recipient: booking.vendor,
@@ -296,60 +312,6 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
   });
 
   res.json(ApiResponse.success(booking, 'Booking completed successfully'));
-});
-
-// @desc    Update payment status (organizer)
-// @route   POST /api/v1/bookings/:id/payment
-// @access  Private
-exports.updatePayment = catchAsync(async (req, res, next) => {
-  const { amount, paymentMethod, transactionId, notes } = req.body;
-  const booking = await Booking.findById(req.params.id);
-
-  if (!booking) {
-    return next(new ApiError('Booking not found', 404));
-  }
-
-  // Only organizer can update payment
-  if (booking.organizer.toString() !== req.user._id.toString()) {
-    return next(new ApiError('Only organizer can update payment', 403));
-  }
-
-  // Add payment record to payments array
-  if (!booking.payments) booking.payments = [];
-  booking.payments.push({
-    amount,
-    paymentMethod,
-    transactionId,
-    paidAt: new Date(),
-    notes
-  });
-
-  // Calculate total paid from payments array
-  booking.totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0);
-  booking.pricePaid = booking.totalPaid;
-  booking.paymentMethod = paymentMethod;
-  if (transactionId) booking.transactionId = transactionId;
-
-  // Update payment status
-  if (booking.totalPaid >= booking.priceAgreed) {
-    booking.paymentStatus = 'paid';
-  } else if (booking.totalPaid > 0) {
-    booking.paymentStatus = 'partial';
-  }
-
-  await booking.save();
-
-  // Notify vendor
-  await Notification.createNotification({
-    recipient: booking.vendor,
-    type: 'payment',
-    title: 'Payment Received',
-    message: `Payment of ₹${amount} received for booking`,
-    relatedBooking: booking._id,
-    actionUrl: `/bookings/${booking._id}`
-  });
-
-  res.json(ApiResponse.success(booking, 'Payment updated successfully'));
 });
 
 // @desc    Record payment (vendor)
@@ -377,23 +339,14 @@ exports.recordPayment = catchAsync(async (req, res, next) => {
   if (!booking.payments) booking.payments = [];
   booking.payments.push({
     amount,
-    paymentMethod: paymentMethod || 'other',
+    // Only the platform records online payments
+    paymentMethod: paymentMethod && paymentMethod !== 'razorpay' ? paymentMethod : 'other',
     transactionId,
     paidAt: new Date(),
     notes
   });
 
-  // Calculate total paid from payments array
-  booking.totalPaid = booking.payments.reduce((sum, p) => sum + p.amount, 0);
-  booking.pricePaid = booking.totalPaid;
-
-  // Update payment status
-  if (booking.totalPaid >= booking.priceAgreed) {
-    booking.paymentStatus = 'paid';
-  } else if (booking.totalPaid > 0) {
-    booking.paymentStatus = 'partial';
-  }
-
+  checkoutService.recalculateBookingTotals(booking);
   await booking.save();
 
   // Notify organizer

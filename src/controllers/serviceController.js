@@ -1,8 +1,19 @@
 const Service = require('../models/Service');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
+const { filterObject } = require('../utils/helpers');
+
+// Fields a vendor may set on their own service. Verification, ratings and
+// booking stats are maintained by the platform.
+const EDITABLE_SERVICE_FIELDS = [
+  'serviceName', 'category', 'description', 'basePrice', 'priceUnit',
+  'portfolioImages', 'portfolioVideos', 'coverImage', 'city', 'serviceAreas',
+  'availability', 'availableDates', 'blackoutDates', 'tags', 'businessName',
+  'gstNumber', 'panNumber', 'metaTitle', 'metaDescription', 'isActive'
+];
 const { clearCache } = require('../middlewares/cache');
 
 // @desc    Get all services with filters
@@ -100,7 +111,7 @@ exports.getServiceBySlug = catchAsync(async (req, res, next) => {
 // @access  Private
 exports.createService = catchAsync(async (req, res, next) => {
   const serviceData = {
-    ...req.body,
+    ...filterObject(req.body, EDITABLE_SERVICE_FIELDS),
     provider: req.user._id
   };
 
@@ -140,15 +151,17 @@ exports.updateService = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized to update this service', 403));
   }
 
+  const updates = filterObject(req.body, EDITABLE_SERVICE_FIELDS);
+
   // Update coordinates if provided
   if (req.body.coordinates) {
-    req.body.location = {
+    updates.location = {
       type: 'Point',
       coordinates: req.body.coordinates
     };
   }
 
-  service = await Service.findByIdAndUpdate(req.params.id, req.body, {
+  service = await Service.findByIdAndUpdate(req.params.id, updates, {
     new: true,
     runValidators: true
   });
@@ -328,7 +341,13 @@ exports.verifyService = catchAsync(async (req, res, next) => {
   service.verifiedAt = new Date();
   await service.save();
 
-  // TODO: Notify vendor about verification
+  await Notification.createNotification({
+    recipient: service.provider,
+    type: 'system',
+    title: 'Service Verified',
+    message: `"${service.serviceName}" is now verified and shows a Verified badge`,
+    actionUrl: `/services/${service._id}`
+  });
 
   res.json(ApiResponse.success(service, 'Service verified successfully'));
 });

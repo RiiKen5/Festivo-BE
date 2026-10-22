@@ -51,7 +51,13 @@ const bookingSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  // totalPaid: everything received; pricePaid: what is kept after refunds
   totalPaid: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  refundedAmount: {
     type: Number,
     default: 0,
     min: 0
@@ -63,7 +69,7 @@ const bookingSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'upi', 'card', 'netbanking', 'bank_transfer', 'other']
+    enum: ['cash', 'upi', 'card', 'netbanking', 'bank_transfer', 'razorpay', 'other']
   },
   transactionId: String,
   razorpayOrderId: String,
@@ -78,7 +84,8 @@ const bookingSchema = new mongoose.Schema({
     },
     paymentMethod: {
       type: String,
-      enum: ['cash', 'upi', 'bank_transfer', 'card', 'netbanking', 'other']
+      // razorpay: paid online through the platform; others are recorded by the vendor
+      enum: ['cash', 'upi', 'bank_transfer', 'card', 'netbanking', 'razorpay', 'other']
     },
     transactionId: String,
     paidAt: {
