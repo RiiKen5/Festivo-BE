@@ -2,7 +2,8 @@ require('dotenv').config();
 const http = require('http');
 const app = require('./src/app');
 const connectDB = require('./src/config/database');
-const { initializeSocket } = require('./src/socket');
+const mongoose = require('mongoose');
+const { initializeSocket, getIO } = require('./src/socket');
 
 const PORT = process.env.PORT || 5000;
 
@@ -56,10 +57,17 @@ process.on('unhandledRejection', (err) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
+// Graceful shutdown (Render sends SIGTERM on every deploy)
+const shutdown = (signal) => {
+  console.log(`${signal} received. Shutting down gracefully...`);
+  // Don't wait forever on long-lived socket connections
+  setTimeout(() => process.exit(0), 10000).unref();
+  server.close(async () => {
+    await mongoose.connection.close();
     console.log('Process terminated');
+    process.exit(0);
   });
-});
+  getIO()?.close();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
