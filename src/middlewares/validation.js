@@ -1,5 +1,6 @@
 const { validationResult, body, param, query } = require('express-validator');
 const ApiError = require('../utils/apiError');
+const { TASK_CATEGORIES } = require('../config/constants');
 
 // Validation result handler
 const validate = (req, res, next) => {
@@ -222,7 +223,7 @@ const taskValidations = {
       .isLength({ min: 3, max: 200 })
       .withMessage('Task name must be between 3 and 200 characters'),
     body('category')
-      .isIn(['venue', 'food', 'decor', 'music', 'photo', 'logistics', 'communication', 'other'])
+      .isIn(TASK_CATEGORIES)
       .withMessage('Invalid category')
   ]
 };

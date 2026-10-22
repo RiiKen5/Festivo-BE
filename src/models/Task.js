@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { TASK_CATEGORIES } = require('../config/constants');
 
 const taskSchema = new mongoose.Schema({
   // References
@@ -30,7 +31,7 @@ const taskSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['venue', 'food', 'decor', 'music', 'photo', 'logistics', 'communication', 'other'],
+    enum: TASK_CATEGORIES,
     required: true
   },
 

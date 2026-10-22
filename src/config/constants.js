@@ -80,6 +80,14 @@ module.exports = {
     REFUNDED: 'refunded'
   },
 
+  // Task Categories: the web app's planning categories, plus the original
+  // shorter names kept valid for existing tasks
+  TASK_CATEGORIES: [
+    'venue', 'catering', 'decoration', 'entertainment', 'photography',
+    'guest_management', 'logistics', 'budget', 'other',
+    'food', 'decor', 'music', 'photo', 'communication'
+  ],
+
   // Task Status
   TASK_STATUS: {
     PENDING: 'pending',
