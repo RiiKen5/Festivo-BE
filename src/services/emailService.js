@@ -1,3 +1,4 @@
+const { frontendUrl } = require('../config/frontend');
 const nodemailer = require('nodemailer');
 
 class EmailService {
@@ -87,7 +88,7 @@ class EmailService {
           <li>Connect with attendees and vendors</li>
         </ul>
         <p>Get started by creating your first event or exploring our marketplace!</p>
-        <a href="${process.env.FRONTEND_URL}/dashboard"
+        <a href="${frontendUrl()}/dashboard"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 16px;">
           Get Started
         </a>
@@ -145,7 +146,7 @@ class EmailService {
           <p><strong>Amount:</strong> ₹${booking.priceAgreed}</p>
         </div>
         <p>You can view and manage your booking from your dashboard.</p>
-        <a href="${process.env.FRONTEND_URL}/bookings/${booking._id}"
+        <a href="${frontendUrl()}/bookings/${booking._id}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
           View Booking
         </a>
@@ -171,7 +172,7 @@ class EmailService {
           <p><strong>Location:</strong> ${event.locationName}</p>
           <p><strong>Address:</strong> ${event.address}</p>
         </div>
-        <a href="${process.env.FRONTEND_URL}/events/${event._id}"
+        <a href="${frontendUrl()}/events/${event._id}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
           View Event Details
         </a>
@@ -198,7 +199,7 @@ class EmailService {
           <p><strong>Proposed Amount:</strong> ₹${booking.priceAgreed}</p>
         </div>
         <p>Please review and respond to this request as soon as possible.</p>
-        <a href="${process.env.FRONTEND_URL}/bookings/${booking._id}"
+        <a href="${frontendUrl()}/bookings/${booking._id}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
           Review Request
         </a>

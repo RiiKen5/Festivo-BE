@@ -1,3 +1,4 @@
+const { frontendUrl } = require('../config/frontend');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { OAuth2Client } = require('google-auth-library');
@@ -30,7 +31,7 @@ exports.register = catchAsync(async (req, res, next) => {
       await existingUser.save();
 
       // Send verification email
-      const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+      const verificationUrl = `${frontendUrl()}/auth/verify-email?token=${emailVerificationToken}`;
       try {
         await emailService.sendEmailVerification(existingUser, verificationUrl);
       } catch (error) {
@@ -72,7 +73,7 @@ exports.register = catchAsync(async (req, res, next) => {
   });
 
   // Send email verification link
-  const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+  const verificationUrl = `${frontendUrl()}/auth/verify-email?token=${emailVerificationToken}`;
   let emailSent = false;
   try {
     await emailService.sendEmailVerification(user, verificationUrl);
@@ -141,7 +142,7 @@ exports.login = catchAsync(async (req, res, next) => {
     await user.save();
 
     // Send verification email
-    const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+    const verificationUrl = `${frontendUrl()}/auth/verify-email?token=${emailVerificationToken}`;
     try {
       await emailService.sendEmailVerification(user, verificationUrl);
     } catch (error) {
@@ -321,7 +322,7 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
   await user.save();
 
   // Build reset URL
-  const resetUrl = `${process.env.FRONTEND_URL}/auth/reset-password?token=${resetToken}`;
+  const resetUrl = `${frontendUrl()}/auth/reset-password?token=${resetToken}`;
 
   try {
     await emailService.sendPasswordResetEmail(user, resetUrl);
@@ -462,7 +463,7 @@ exports.resendEmailVerification = catchAsync(async (req, res, next) => {
   await user.save();
 
   // Send verification email
-  const verificationUrl = `${process.env.FRONTEND_URL}/auth/verify-email?token=${emailVerificationToken}`;
+  const verificationUrl = `${frontendUrl()}/auth/verify-email?token=${emailVerificationToken}`;
   try {
     await emailService.sendEmailVerification(user, verificationUrl);
   } catch (error) {

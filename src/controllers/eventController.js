@@ -1,3 +1,4 @@
+const { frontendUrl } = require('../config/frontend');
 const Event = require('../models/Event');
 const User = require('../models/User');
 const catchAsync = require('../utils/catchAsync');
@@ -573,5 +574,5 @@ exports.regenerateInvite = catchAsync(async (req, res, next) => {
 
 const inviteDetails = (event) => ({
   inviteCode: event.inviteCode,
-  inviteUrl: `${process.env.FRONTEND_URL}/events/${event._id}?invite=${event.inviteCode}`
+  inviteUrl: `${frontendUrl()}/events/${event._id}?invite=${event.inviteCode}`
 });

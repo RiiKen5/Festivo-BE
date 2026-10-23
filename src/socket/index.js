@@ -1,13 +1,14 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { corsOrigin } = require('../config/frontend');
 
 let io = null;
 
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || 'http://localhost:4200',
+      origin: corsOrigin,
       methods: ['GET', 'POST'],
       credentials: true
     },
