@@ -118,9 +118,15 @@ rsvpSchema.pre('save', function(next) {
   next();
 });
 
+// isModified is reset before post('save') runs, so record it here
+rsvpSchema.pre('save', function(next) {
+  this.$locals.attendedChanged = this.isModified('attended');
+  next();
+});
+
 // Update user stats when attended
 rsvpSchema.post('save', async function() {
-  if (this.attended && this.isModified('attended')) {
+  if (this.attended && this.$locals.attendedChanged) {
     const User = mongoose.model('User');
     await User.findByIdAndUpdate(this.attendee, {
       $inc: { eventsAttended: 1, xpPoints: 20 }

@@ -8,7 +8,8 @@ const { validate, rsvpValidations, paramValidations, paginationValidations } = r
 router.use(protect);
 
 router.get('/my-rsvps', paginationValidations, validate, rsvpController.getMyRSVPs);
-router.get('/event/:eventId', paginationValidations, validate, rsvpController.getEventRSVPs);
+// Organizers load the whole guest list, so this allows more than the usual page size
+router.get('/event/:eventId', rsvpController.getEventRSVPs);
 router.get('/event/:eventId/my-rsvp', rsvpController.getMyRSVP);
 router.get('/event/:eventId/stats', rsvpController.getRSVPStats);
 

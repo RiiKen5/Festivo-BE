@@ -79,7 +79,7 @@ exports.getEvents = catchAsync(async (req, res, next) => {
 exports.getEvent = catchAsync(async (req, res, next) => {
   const event = await Event.findById(req.params.id)
     .select('+inviteCode')
-    .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings')
+    .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings eventsOrganized')
     .populate('coOrganizers', 'name profilePhoto');
 
   await sendEventIfAccessible(event, req, res, next);
@@ -103,7 +103,7 @@ const sendEventIfAccessible = async (event, req, res, next) => {
 exports.getEventBySlug = catchAsync(async (req, res, next) => {
   const event = await Event.findOne({ slug: req.params.slug })
     .select('+inviteCode')
-    .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings')
+    .populate('organizer', 'name profilePhoto bio ratingAverage totalRatings eventsOrganized')
     .populate('coOrganizers', 'name profilePhoto');
 
   await sendEventIfAccessible(event, req, res, next);
@@ -363,6 +363,17 @@ exports.completeEvent = catchAsync(async (req, res, next) => {
 
   if (event.organizer.toString() !== req.user._id.toString()) {
     return next(new ApiError('Not authorized', 403));
+  }
+
+  if (event.status === 'cancelled' || event.status === 'completed') {
+    return next(new ApiError(`Event is already ${event.status}`, 400));
+  }
+
+  // Completing releases ticket revenue, so only once the event has happened
+  const startOfEventDay = new Date(event.date);
+  startOfEventDay.setHours(0, 0, 0, 0);
+  if (startOfEventDay > new Date()) {
+    return next(new ApiError('You can mark the event completed once it has taken place', 400));
   }
 
   event.status = 'completed';

@@ -45,7 +45,7 @@ const authLimiter = rateLimit({
 // File upload limiter
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // limit each IP to 20 uploads per hour
+  max: 100, // uploads per IP per hour (a vendor portfolio is many images)
   message: {
     success: false,
     error: {

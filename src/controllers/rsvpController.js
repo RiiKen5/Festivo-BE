@@ -13,7 +13,9 @@ const policies = require('../config/policies');
 // @route   GET /api/v1/rsvps/event/:eventId
 // @access  Private
 exports.getEventRSVPs = catchAsync(async (req, res, next) => {
-  const { status, page = 1, limit = 50 } = req.query;
+  const { status } = req.query;
+  const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 1000);
 
   const event = await Event.findById(req.params.eventId);
   if (!event) {
@@ -371,27 +373,25 @@ exports.rateEvent = catchAsync(async (req, res, next) => {
 exports.getMyRSVPs = catchAsync(async (req, res, next) => {
   const { status, upcoming = 'true', page = 1, limit = 20 } = req.query;
 
-  const query = { attendee: req.user._id };
-  if (status) query.status = status;
+  const query = { attendee: req.user._id, status: status || { $ne: 'cancelled' } };
 
   const rsvps = await RSVP.find(query)
     .populate({
       path: 'event',
-      select: 'title date time city coverPhoto status',
-      match: upcoming === 'true' ? { date: { $gte: new Date() } } : {}
+      select: 'title slug date time city locationName coverPhoto status entryFee',
+      match: upcoming === 'true' ? { date: { $gte: startOfToday() } } : {}
     })
-    .sort(upcoming === 'true' ? 'event.date' : '-event.date')
-    .limit(limit * 1)
-    .skip((page - 1) * limit)
     .lean();
 
-  // Filter out null events (from match condition)
-  const filteredRsvps = rsvps.filter(rsvp => rsvp.event !== null);
-
-  const total = filteredRsvps.length;
+  // Drop RSVPs whose event didn't match, then order by event date
+  // (sorting on a populated field can't happen in the query)
+  const sorted = rsvps
+    .filter(rsvp => rsvp.event !== null)
+    .sort((a, b) => (new Date(a.event.date) - new Date(b.event.date)) * (upcoming === 'true' ? 1 : -1));
+  const pageItems = sorted.slice((page - 1) * limit, page * limit);
 
   res.json(
-    ApiResponse.paginated(filteredRsvps, page, limit, total, 'Your RSVPs retrieved')
+    ApiResponse.paginated(pageItems, page, limit, sorted.length, 'Your RSVPs retrieved')
   );
 });
 

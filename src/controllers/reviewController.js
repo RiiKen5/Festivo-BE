@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Review = require('../models/Review');
 const Booking = require('../models/Booking');
 const Service = require('../models/Service');
@@ -160,11 +161,12 @@ exports.updateReview = catchAsync(async (req, res, next) => {
     return next(new ApiError('Can only edit reviews within 7 days of posting', 400));
   }
 
-  review = await Review.findByIdAndUpdate(
-    req.params.id,
-    { rating, reviewText, ratings, photos },
-    { new: true, runValidators: true }
-  );
+  // Saved through the document so the rating hooks run
+  if (rating !== undefined) review.rating = rating;
+  if (reviewText !== undefined) review.reviewText = reviewText;
+  if (ratings !== undefined) review.ratings = ratings;
+  if (photos !== undefined) review.photos = photos;
+  await review.save();
 
   res.json(ApiResponse.success(review, 'Review updated successfully'));
 });
@@ -183,7 +185,7 @@ exports.deleteReview = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized to delete this review', 403));
   }
 
-  await Review.findByIdAndDelete(req.params.id);
+  await review.deleteOne();
 
   res.json(ApiResponse.success(null, 'Review deleted successfully'));
 });
@@ -356,7 +358,7 @@ exports.getMyReviews = catchAsync(async (req, res, next) => {
 // @access  Public
 exports.getServiceReviewStats = catchAsync(async (req, res, next) => {
   const stats = await Review.aggregate([
-    { $match: { service: require('mongoose').Types.ObjectId(req.params.serviceId), isApproved: true } },
+    { $match: { service: new mongoose.Types.ObjectId(req.params.serviceId), isApproved: true } },
     {
       $group: {
         _id: null,
@@ -372,7 +374,7 @@ exports.getServiceReviewStats = catchAsync(async (req, res, next) => {
 
   // Rating distribution
   const distribution = await Review.aggregate([
-    { $match: { service: require('mongoose').Types.ObjectId(req.params.serviceId), isApproved: true } },
+    { $match: { service: new mongoose.Types.ObjectId(req.params.serviceId), isApproved: true } },
     {
       $group: {
         _id: '$rating',
@@ -396,16 +398,18 @@ exports.getServiceReviewStats = catchAsync(async (req, res, next) => {
 exports.moderateReview = catchAsync(async (req, res, next) => {
   const { isApproved, reason } = req.body;
 
-  const review = await Review.findByIdAndUpdate(
-    req.params.id,
-    // Moderation resolves the flag and outstanding reports either way
-    { isApproved, isFlagged: false, reports: [] },
-    { new: true }
-  );
+  const review = await Review.findById(req.params.id);
 
   if (!review) {
     return next(new ApiError('Review not found', 404));
   }
+
+  // Moderation resolves the flag and outstanding reports either way.
+  // Saved through the document so removed reviews leave the rating.
+  review.isApproved = isApproved;
+  review.isFlagged = false;
+  review.reports = [];
+  await review.save();
 
   // Notify reviewer if rejected
   if (!isApproved) {

@@ -107,15 +107,21 @@ reviewSchema.index({ reviewer: 1 });
 reviewSchema.index({ rating: -1 });
 reviewSchema.index({ isApproved: 1 });
 
-// Update service rating after review
+// isNew/isModified are reset before post('save') runs, so record them here
+reviewSchema.pre('save', function(next) {
+  this.$locals.ratingChanged = this.isNew || this.isModified('rating') || this.isModified('isApproved');
+  next();
+});
+
+// Update service (and vendor) rating after review
 reviewSchema.post('save', async function() {
-  if (this.isNew || this.isModified('rating')) {
-    await this.constructor.updateServiceRating(this.service);
+  if (this.$locals.ratingChanged) {
+    await this.constructor.updateServiceRating(this.service._id || this.service);
   }
 });
 
 reviewSchema.post('deleteOne', { document: true, query: false }, async function() {
-  await this.constructor.updateServiceRating(this.service);
+  await this.constructor.updateServiceRating(this.service._id || this.service);
 });
 
 // Static method to update service rating
@@ -172,12 +178,10 @@ reviewSchema.statics.updateVendorRating = async function(vendorId) {
 
   const User = mongoose.model('User');
 
-  if (stats.length > 0) {
-    await User.findByIdAndUpdate(vendorId, {
-      ratingAverage: Math.round(stats[0].avgRating * 10) / 10,
-      totalRatings: stats[0].totalRatings
-    });
-  }
+  await User.findByIdAndUpdate(vendorId, {
+    ratingAverage: stats.length ? Math.round(stats[0].avgRating * 10) / 10 : 0,
+    totalRatings: stats.length ? stats[0].totalRatings : 0
+  });
 };
 
 // Method to add helpful vote

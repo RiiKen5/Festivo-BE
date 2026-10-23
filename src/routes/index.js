@@ -14,6 +14,7 @@ const reviewRoutes = require('./reviewRoutes');
 const notificationRoutes = require('./notificationRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const adminRoutes = require('./adminRoutes');
+const uploadRoutes = require('./uploadRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -28,6 +29,7 @@ router.use('/reviews', reviewRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
+router.use('/uploads', uploadRoutes);
 
 // Health check
 router.get('/health', (req, res) => {

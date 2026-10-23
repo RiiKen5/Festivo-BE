@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { protect } = require('../middlewares/auth');
-const { authLimiter } = require('../middlewares/rateLimiter');
+const { authLimiter, uploadLimiter } = require('../middlewares/rateLimiter');
+const uploadController = require('../controllers/uploadController');
 const { validate, authValidations } = require('../middlewares/validation');
 
 // Public routes
@@ -66,7 +67,7 @@ router.post(
 );
 
 router.put('/profile', authController.updateProfile);
-router.put('/profile-photo', authController.updateProfilePhoto);
+router.post('/upload-avatar', uploadLimiter, uploadController.acceptImage('profilePhoto'), uploadController.uploadAvatar);
 
 router.post('/resend-email-verification', authController.resendEmailVerification);
 router.post('/verify-phone/request', authController.requestPhoneVerification);

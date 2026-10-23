@@ -27,6 +27,9 @@ const startServer = async () => {
     // Connect to MongoDB
     await connectDB();
 
+    // Background jobs
+    require('./src/jobs/autoComplete').start();
+
     // Start server
     server.listen(PORT, () => {
       console.log(`

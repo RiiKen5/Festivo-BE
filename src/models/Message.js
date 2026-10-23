@@ -69,9 +69,15 @@ messageSchema.pre('save', function(next) {
   next();
 });
 
+// isNew is reset before post('save') runs, so record it here
+messageSchema.pre('save', function(next) {
+  this.$locals.wasNew = this.isNew;
+  next();
+});
+
 // Update booking message stats
 messageSchema.post('save', async function() {
-  if (this.relatedBooking && this.isNew) {
+  if (this.relatedBooking && this.$locals.wasNew) {
     const Booking = mongoose.model('Booking');
     await Booking.findByIdAndUpdate(this.relatedBooking, {
       lastMessageAt: this.createdAt,

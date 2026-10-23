@@ -338,6 +338,8 @@ describe('paid event tickets', () => {
       razorpay_order_id: orderId, razorpay_payment_id: 'pay_d', razorpay_signature: sign(orderId, 'pay_d')
     });
 
+    // The event takes place, then the organizer completes it
+    await Event.updateOne({ _id: event._id }, { date: new Date(Date.now() - DAY) });
     await request(app).post(`/api/v1/events/${event._id}/complete`).set(auth(organizer.token)).expect(200);
     expect((await Payment.findOne({ rsvp: res.body.data.rsvp._id })).payoutStatus).toBe('pending');
   });

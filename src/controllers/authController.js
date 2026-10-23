@@ -376,6 +376,12 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
     }
   });
 
+  // A changed phone number has to be verified again
+  if (req.body.phone !== undefined && req.body.phone !== req.user.phone) {
+    updates.phone = req.body.phone || undefined;
+    updates.phoneVerified = false;
+  }
+
   const user = await User.findByIdAndUpdate(
     req.user._id,
     updates,
@@ -383,24 +389,6 @@ exports.updateProfile = catchAsync(async (req, res, next) => {
   );
 
   res.json(ApiResponse.success(user, 'Profile updated successfully'));
-});
-
-// @desc    Update profile photo
-// @route   PUT /api/v1/auth/profile-photo
-// @access  Private
-exports.updateProfilePhoto = catchAsync(async (req, res, next) => {
-  if (!req.file) {
-    return next(new ApiError('Please upload a photo', 400));
-  }
-
-  // File URL will be set by upload middleware
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { profilePhoto: req.file.location || req.file.path },
-    { new: true }
-  );
-
-  res.json(ApiResponse.success(user, 'Profile photo updated successfully'));
 });
 
 // @desc    Verify email with token

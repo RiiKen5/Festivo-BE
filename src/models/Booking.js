@@ -144,17 +144,24 @@ bookingSchema.index({ eventDate: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ createdAt: -1 });
 
+// isNew/isModified are reset before post('save') runs, so record them here
+bookingSchema.pre('save', function(next) {
+  this.$locals.wasNew = this.isNew;
+  this.$locals.statusChanged = this.isModified('status');
+  next();
+});
+
 // Update service stats after booking
 bookingSchema.post('save', async function() {
   const Service = mongoose.model('Service');
 
-  if (this.isNew) {
+  if (this.$locals.wasNew) {
     await Service.findByIdAndUpdate(this.service, {
       $inc: { totalBookings: 1 }
     });
   }
 
-  if (this.status === 'completed' && this.isModified('status')) {
+  if (this.status === 'completed' && this.$locals.statusChanged) {
     await Service.findByIdAndUpdate(this.service, {
       $inc: { completedBookings: 1 }
     });

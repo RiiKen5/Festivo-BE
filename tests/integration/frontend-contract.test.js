@@ -129,3 +129,34 @@ it('errors carry a readable message for the UI', async () => {
   expect(res.status).toBe(400);
   expect(res.body.error.details[0].message).toBe('Invalid event ID');
 });
+
+it('completing and reviewing a booking updates service and vendor stats', async () => {
+  const organizer = await createUser();
+  const vendor = await createUser();
+  const event = await createEvent(organizer.user);
+  const service = await createService(vendor.user);
+  const booking = await request(app).post('/api/v1/bookings').set(auth(organizer.token))
+    .send({ eventId: event._id, serviceId: service._id });
+  const id = booking.body.data._id;
+  await request(app).post(`/api/v1/bookings/${id}/confirm`).set(auth(vendor.token)).send({});
+  await request(app).post(`/api/v1/bookings/${id}/complete`).set(auth(organizer.token));
+  const review = await request(app).post('/api/v1/reviews').set(auth(organizer.token))
+    .send({ bookingId: id, rating: 4, reviewText: 'Good cake overall' });
+
+  let page = await request(app).get(`/api/v1/services/${service._id}`);
+  expect(page.body.data.totalBookings).toBe(1);
+  expect(page.body.data.completedBookings).toBe(1);
+  expect(page.body.data.ratingAverage).toBe(4);
+  expect(page.body.data.totalRatings).toBe(1);
+
+  const stats = await request(app).get(`/api/v1/reviews/service/${service._id}/stats`);
+  expect(stats.status).toBe(200);
+
+  // Removing a review through moderation takes it out of the rating
+  const admin = await createUser({ role: 'admin' });
+  await request(app).put(`/api/v1/reviews/${review.body.data._id}/moderate`).set(auth(admin.token))
+    .send({ isApproved: false }).expect(200);
+  page = await request(app).get(`/api/v1/services/${service._id}`);
+  expect(page.body.data.ratingAverage).toBe(0);
+  expect((await User.findById(vendor.user._id)).ratingAverage).toBe(0);
+});
