@@ -1,0 +1,13 @@
+{
+  "name": "festivo-e2e",
+  "private": true,
+  "description": "Browser journeys across the API and web app. See README.md.",
+  "scripts": {
+    "stack": "node devstack.js",
+    "seed": "node seed.js",
+    "test": "for j in journey-booking journey-events journey-account journey-secondary; do node seed.js && node $j.js || exit 1; done"
+  },
+  "devDependencies": {
+    "playwright": "1.48.2"
+  }
+}

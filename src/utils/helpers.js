@@ -31,6 +31,16 @@ exports.safeEqual = (a, b) => {
 };
 
 /**
+ * Case-insensitive exact match for a city name typed by a user
+ * @param {string} city
+ * @returns {RegExp}
+ */
+exports.cityMatch = (city) => {
+  const escaped = String(city).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${escaped}$`, 'i');
+};
+
+/**
  * Calculate pagination offset
  * @param {number} page - Current page
  * @param {number} limit - Items per page

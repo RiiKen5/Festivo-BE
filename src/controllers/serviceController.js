@@ -4,7 +4,7 @@ const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
-const { filterObject } = require('../utils/helpers');
+const { filterObject, cityMatch } = require('../utils/helpers');
 
 // Fields a vendor may set on their own service. Verification, ratings and
 // booking stats are maintained by the platform.
@@ -37,7 +37,7 @@ exports.getServices = catchAsync(async (req, res, next) => {
   // Build query
   const query = { isActive: true };
 
-  if (city) query.city = city;
+  if (city) query.city = cityMatch(city);
   if (category) query.category = category;
   if (availability) query.availability = availability;
   if (tags) query.tags = { $in: tags.split(',') };
@@ -254,7 +254,7 @@ exports.getServicesByCategory = catchAsync(async (req, res, next) => {
     availability: 'available'
   };
 
-  if (city) query.city = city;
+  if (city) query.city = cityMatch(city);
 
   const services = await Service.find(query)
     .populate('provider', 'name profilePhoto ratingAverage')
@@ -315,7 +315,7 @@ exports.getTopRatedServices = catchAsync(async (req, res, next) => {
     totalRatings: { $gte: 5 } // Minimum 5 ratings
   };
 
-  if (city) query.city = city;
+  if (city) query.city = cityMatch(city);
   if (category) query.category = category;
 
   const services = await Service.find(query)

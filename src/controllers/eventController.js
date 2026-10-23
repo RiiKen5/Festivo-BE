@@ -6,6 +6,13 @@ const ApiResponse = require('../utils/apiResponse');
 const { clearCache } = require('../middlewares/cache');
 const { filterObject } = require('../utils/helpers');
 const { canAccessEvent, serializeEvent } = require('../utils/eventAccess');
+const { cityMatch } = require('../utils/helpers');
+
+const startOfToday = () => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
 const Booking = require('../models/Booking');
 const RSVP = require('../models/RSVP');
 const Notification = require('../models/Notification');
@@ -34,24 +41,22 @@ exports.getEvents = catchAsync(async (req, res, next) => {
     dateFrom,
     dateTo,
     tags,
-    sort = '-date',
+    sort = 'date',
     search
   } = req.query;
 
   // Build query
   const query = { isPublic: true, isPublished: true, status: { $ne: 'cancelled' } };
 
-  if (city) query.city = city;
-  if (eventType) query.eventType = eventType;
+  if (city) query.city = cityMatch(city);
+  if (eventType) query.eventType = { $in: eventType.split(',') };
   if (vibeScore) query.vibeScore = vibeScore;
   if (isPaid !== undefined) query.isPaid = isPaid === 'true';
   if (tags) query.tags = { $in: tags.split(',') };
 
-  if (dateFrom || dateTo) {
-    query.date = {};
-    if (dateFrom) query.date.$gte = new Date(dateFrom);
-    if (dateTo) query.date.$lte = new Date(dateTo);
-  }
+  // Upcoming events only, unless a date range is asked for
+  query.date = { $gte: dateFrom ? new Date(dateFrom) : startOfToday() };
+  if (dateTo) query.date.$lte = new Date(dateTo);
 
   // Text search
   if (search) {
@@ -438,7 +443,7 @@ exports.getUpcomingEvents = catchAsync(async (req, res, next) => {
     date: { $gte: new Date() }
   };
 
-  if (city) query.city = city;
+  if (city) query.city = cityMatch(city);
 
   const events = await Event.find(query)
     .populate('organizer', 'name profilePhoto')
@@ -462,7 +467,7 @@ exports.getPopularEvents = catchAsync(async (req, res, next) => {
     date: { $gte: new Date() }
   };
 
-  if (city) query.city = city;
+  if (city) query.city = cityMatch(city);
 
   const events = await Event.find(query)
     .populate('organizer', 'name profilePhoto')
