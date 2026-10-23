@@ -9,6 +9,7 @@ const ApiResponse = require('../utils/apiResponse');
 const { hashToken, safeEqual } = require('../utils/helpers');
 const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
+const { sanitizeAcquisition } = require('../utils/acquisition');
 
 // Initialize Google OAuth client
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -17,7 +18,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // @route   POST /api/v1/auth/register
 // @access  Public
 exports.register = catchAsync(async (req, res, next) => {
-  const { email, password, phone, name, city, userType } = req.body;
+  const { email, password, phone, name, city, userType, acquisition } = req.body;
 
   // Check if user exists
   const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
@@ -69,7 +70,8 @@ exports.register = catchAsync(async (req, res, next) => {
     emailVerified: false,
     phoneVerified: false,
     emailVerificationToken: hashedEmailToken,
-    emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+    emailVerificationExpires: Date.now() + 24 * 60 * 60 * 1000, // 24 hours
+    acquisition: sanitizeAcquisition(acquisition, 'email')
   });
 
   // Send email verification link
@@ -611,7 +613,7 @@ exports.registerAdmin = catchAsync(async (req, res, next) => {
 // @route   POST /api/v1/auth/google
 // @access  Public
 exports.googleAuth = catchAsync(async (req, res, next) => {
-  const { credential, idToken, accessToken, token: bodyToken } = req.body;
+  const { credential, idToken, accessToken, token: bodyToken, acquisition, userType } = req.body;
 
   // Support multiple token field names from different Google Sign-In implementations
   const token = credential || idToken || accessToken || bodyToken;
@@ -705,8 +707,9 @@ exports.googleAuth = catchAsync(async (req, res, next) => {
       profilePhoto: picture,
       emailVerified: true, // Google accounts are verified
       phoneVerified: false,
-      userType: 'all',
+      userType: ['organizer', 'helper', 'attendee'].includes(userType) ? userType : 'all',
       city: 'Not Set', // User can update later
+      acquisition: sanitizeAcquisition(acquisition, 'google'),
       // Generate a random password for Google users (they won't use it)
       password: crypto.randomBytes(32).toString('hex')
     });

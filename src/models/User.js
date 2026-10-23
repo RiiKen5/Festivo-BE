@@ -179,6 +179,23 @@ const userSchema = new mongoose.Schema({
 
   lastLoginAt: {
     type: Date
+  },
+
+  // First-touch marketing attribution, captured once at signup
+  acquisition: {
+    type: new mongoose.Schema({
+      source: String,
+      medium: String,
+      campaign: String,
+      content: String,
+      term: String,
+      ref: String,
+      referrer: String,
+      landingPage: String,
+      firstSeenAt: Date,
+      signupMethod: { type: String, enum: ['email', 'google'] }
+    }, { _id: false }),
+    select: false
   }
 }, {
   timestamps: true
@@ -187,6 +204,7 @@ const userSchema = new mongoose.Schema({
 // Indexes (email and phone already indexed via unique: true)
 userSchema.index({ city: 1 });
 userSchema.index({ userType: 1 });
+userSchema.index({ 'acquisition.source': 1 });
 userSchema.index({ location: '2dsphere' });
 
 // Hash password before saving

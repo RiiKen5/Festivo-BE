@@ -5,6 +5,7 @@ const Booking = require('../models/Booking');
 const Review = require('../models/Review');
 const Payment = require('../models/Payment');
 const Notification = require('../models/Notification');
+const RSVP = require('../models/RSVP');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
@@ -148,4 +149,73 @@ exports.getFlaggedReviews = catchAsync(async (req, res, next) => {
     .lean();
 
   res.json(ApiResponse.success(reviews, 'Flagged reviews retrieved'));
+});
+
+// @desc    Where signups come from and how far each side gets in the funnel
+// @route   GET /api/v1/admin/growth?days=30
+// @access  Admin
+exports.getGrowth = catchAsync(async (req, res, next) => {
+  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 1), 365);
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const inWindow = { createdAt: { $gte: since } };
+  const collected = { $in: ['paid', 'partially_refunded', 'refunded'] };
+  const accepted = { $in: ['confirmed', 'in_progress', 'completed'] };
+
+  const signups = await User.find({ ...inWindow, role: 'user' }).select('+acquisition').lean();
+  const ids = signups.map(u => u._id);
+
+  // Which of the new users reached each activation event
+  const [requesters, listers, hosts, paidBookings, bookingRequests, confirmedVendors, activeVendors,
+    eventsCreated, eventsWithGuests, northStar] = await Promise.all([
+    Booking.distinct('organizer', { organizer: { $in: ids } }),
+    Service.distinct('provider', { provider: { $in: ids } }),
+    Event.distinct('organizer', { organizer: { $in: ids } }),
+    Payment.countDocuments({ type: 'booking', status: collected, paidAt: { $gte: since } }),
+    Booking.countDocuments(inWindow),
+    Booking.distinct('vendor', { status: accepted }).then(v => v.length),
+    Service.distinct('provider', { isActive: true }).then(v => v.length),
+    Event.countDocuments(inWindow),
+    RSVP.aggregate([
+      { $match: { status: 'going' } },
+      { $group: { _id: '$event', count: { $sum: 1 } } },
+      { $match: { count: { $gte: 3 } } },
+      { $lookup: { from: 'events', localField: '_id', foreignField: '_id', as: 'event' } },
+      { $match: { 'event.createdAt': { $gte: since } } },
+      { $count: 'n' }
+    ]).then(r => (r[0] && r[0].n) || 0),
+    Payment.aggregate([
+      { $match: { type: 'booking', status: collected } },
+      { $lookup: { from: 'bookings', localField: 'booking', foreignField: '_id', as: 'booking' } },
+      { $match: { 'booking.status': 'completed', 'booking.updatedAt': { $gte: since } } },
+      { $group: { _id: null, count: { $sum: 1 }, gmv: { $sum: '$amount' } } }
+    ])
+  ]);
+
+  const sets = { requested: new Set(requesters.map(String)), listed: new Set(listers.map(String)), hosted: new Set(hosts.map(String)) };
+  const bySource = {};
+  for (const u of signups) {
+    const source = (u.acquisition && u.acquisition.source) || 'unknown';
+    const row = bySource[source] || (bySource[source] = { source, signups: 0, requestedBooking: 0, listedService: 0, createdEvent: 0, activated: 0 });
+    const id = String(u._id);
+    row.signups++;
+    if (sets.requested.has(id)) row.requestedBooking++;
+    if (sets.listed.has(id)) row.listedService++;
+    if (sets.hosted.has(id)) row.createdEvent++;
+    if (sets.requested.has(id) || sets.listed.has(id) || sets.hosted.has(id)) row.activated++;
+  }
+
+  res.json(ApiResponse.success({
+    days,
+    signups: signups.length,
+    bySource: Object.values(bySource).sort((a, b) => b.signups - a.signups),
+    funnel: {
+      bookingRequests,
+      paidBookings,
+      completedPaidBookings: (northStar[0] && northStar[0].count) || 0,
+      completedPaidGmv: round2(northStar[0] && northStar[0].gmv),
+      eventsCreated,
+      eventsWithThreeGuests: eventsWithGuests
+    },
+    supply: { activeVendors, vendorsWithAcceptedBooking: confirmedVendors }
+  }, 'Growth metrics retrieved'));
 });

@@ -7,8 +7,8 @@ const AxeBuilder = require('@axe-core/playwright').default;
   const browser = await chromium.launch();
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  const pages = { public: ['/', '/events', `/events/${events[0].slug}`, '/services', `/services/${services[0].slug}`, '/auth/login', '/auth/register', '/terms'],
-                  private: ['/dashboard', '/bookings', '/messages', '/notifications', '/profile', '/events/create', '/services/create', '/dashboard/earnings', '/admin'] };
+  const pages = { public: ['/', '/events', `/events/${events[0].slug}`, '/services', `/services/${services[0].slug}`, '/auth/login', '/auth/register', '/terms', '/for-vendors'],
+                  private: ['/dashboard', '/bookings', '/messages', '/notifications', '/profile', '/events/create', '/services/create', '/dashboard/earnings', '/dashboard/my-services', '/admin'] };
   const totals = {};
   const scan = async (r) => {
     await page.goto(APP + r); await settle(page, 600);
