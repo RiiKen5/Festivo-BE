@@ -20,4 +20,6 @@ cd backend/e2e && npm test           # terminal 3: seeds and runs every journey
 | `journey-secondary.js` | vendor cancels a paid booking, pause/edit listing, edit/unpublish event, cancel ticket refund, notifications, legal pages |
 
 `crawl.js` visits every page as each role; `mobile.js` checks for horizontal
-overflow at phone width. Screenshots land in `shots/`.
+overflow at phone width; `a11y.js` runs axe-core (WCAG 2 A/AA) on 17 pages.
+Run them with `npm run crawl`, `npm run mobile`, `npm run a11y`.
+Screenshots land in `shots/`.

@@ -62,7 +62,7 @@ exports.getBookings = catchAsync(async (req, res, next) => {
 exports.getBooking = catchAsync(async (req, res, next) => {
   const booking = await Booking.findById(req.params.id)
     .populate('event', 'title date time city address coverPhoto organizer')
-    .populate('service', 'serviceName category basePrice priceUnit coverImage provider')
+    .populate('service', 'serviceName slug category basePrice priceUnit coverImage provider ratingAverage totalRatings completedBookings')
     .populate('organizer', 'name email phone profilePhoto')
     .populate('vendor', 'name email phone profilePhoto');
 

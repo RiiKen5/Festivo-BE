@@ -13,7 +13,7 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     const org = await session(browser, 'rohit'); issues.push(org.issues);
     await login(org.page, 'rohit@test.in');
     await org.page.goto(`${APP}/services/${cake.slug}`); await settle(org.page);
-    await org.page.getByRole('button', { name: 'Book Now' }).click();
+    await org.page.getByRole('button', { name: 'Request booking' }).click();
     await org.page.locator('app-modal select').first().selectOption({ index: 1 }).catch(async () => {
       const opts = await org.page.locator('app-modal select').first().locator('option').allTextContents();
       throw new Error('event options: ' + opts.join(' | '));
