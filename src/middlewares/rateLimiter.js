@@ -1,8 +1,17 @@
 const expressRateLimit = require('express-rate-limit');
 
-// Limits are disabled in the test suite, which makes many requests from one IP
+// The visitor's real address. In production the API sits behind Cloudflare
+// and Render's load balancer, so req.ip is a proxy address shared by every
+// visitor. Cloudflare sets CF-Connecting-IP / True-Client-IP itself
+// (overwriting anything the client sends), so those identify the visitor.
+const clientKey = (req) =>
+  req.headers['cf-connecting-ip'] || req.headers['true-client-ip'] || req.ip || 'unknown';
+
+// Limits are disabled in the test suite, which makes many requests from one IP.
+// Health checks (Render pings it constantly) never count.
 const rateLimit = (options) => expressRateLimit({
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: (req) => process.env.NODE_ENV === 'test' || req.path.endsWith('/health'),
+  keyGenerator: clientKey,
   ...options
 });
 
@@ -20,10 +29,7 @@ const apiLimiter = rateLimit({
     }
   },
   standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => {
-    return req.ip || req.headers['x-forwarded-for'] || 'unknown';
-  }
+  legacyHeaders: false
 });
 
 // Auth limiter (stricter)
@@ -88,6 +94,7 @@ const messageLimiter = rateLimit({
 });
 
 module.exports = {
+  clientKey,
   apiLimiter,
   authLimiter,
   uploadLimiter,

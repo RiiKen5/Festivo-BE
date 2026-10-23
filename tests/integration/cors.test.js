@@ -22,3 +22,12 @@ describe('CORS with several frontend sites', () => {
     expect(frontendUrl()).toBe('https://festivo.paathly.in');
   });
 });
+
+describe('rate limit identity', () => {
+  const { clientKey } = require('../../src/middlewares/rateLimiter');
+
+  it('uses the address Cloudflare reports, not the shared proxy address', () => {
+    expect(clientKey({ headers: { 'cf-connecting-ip': '203.0.113.7' }, ip: '10.0.0.1' })).toBe('203.0.113.7');
+    expect(clientKey({ headers: {}, ip: '10.0.0.1' })).toBe('10.0.0.1');
+  });
+});
