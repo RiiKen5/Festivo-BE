@@ -122,7 +122,7 @@ exports.createReview = catchAsync(async (req, res, next) => {
     message: `${req.user.name} left a ${rating}-star review for ${booking.service.serviceName}`,
     relatedBooking: bookingId,
     relatedUser: req.user._id,
-    actionUrl: `/reviews/${review._id}`
+    actionUrl: `/services/${review.service._id || review.service}`
   });
 
   // Award XP
@@ -221,7 +221,7 @@ exports.addVendorResponse = catchAsync(async (req, res, next) => {
     title: 'Vendor Response',
     message: 'The vendor has responded to your review',
     relatedUser: req.user._id,
-    actionUrl: `/reviews/${review._id}`
+    actionUrl: `/services/${review.service._id || review.service}`
   });
 
   res.json(ApiResponse.success(review, 'Response added successfully'));
@@ -418,7 +418,7 @@ exports.moderateReview = catchAsync(async (req, res, next) => {
       type: 'system',
       title: 'Review Rejected',
       message: reason || 'Your review has been rejected for violating our guidelines',
-      actionUrl: '/my-reviews'
+      actionUrl: '/dashboard'
     });
   }
 

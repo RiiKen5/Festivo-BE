@@ -112,7 +112,7 @@ exports.createTask = catchAsync(async (req, res, next) => {
       title: 'Task Assigned',
       message: `You have been assigned a new task: ${taskName}`,
       relatedEvent: eventId,
-      actionUrl: `/events/${eventId}/tasks`
+      actionUrl: `/events/${eventId}`
     });
   }
 
@@ -158,7 +158,7 @@ exports.updateTask = catchAsync(async (req, res, next) => {
       title: 'Task Assigned',
       message: `You have been assigned a task: ${task.taskName}`,
       relatedEvent: task.event._id || task.event,
-      actionUrl: `/events/${task.event._id || task.event}/tasks`
+      actionUrl: `/events/${task.event._id || task.event}`
     });
   }
 
