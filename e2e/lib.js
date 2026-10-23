@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 require('fs').mkdirSync(require('path').join(__dirname, 'shots'), { recursive: true });
-const APP = 'http://localhost:4200';
-const API = 'http://localhost:5000/api/v1';
+const APP = process.env.APP || 'http://localhost:4200';
+const API = process.env.API || 'http://localhost:5000/api/v1';
 
 // Stand-in for Razorpay Checkout: "pays" instantly, signing with the local test secret
 const FAKE_CHECKOUT = `
