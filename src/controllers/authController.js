@@ -78,8 +78,7 @@ exports.register = catchAsync(async (req, res, next) => {
   const verificationUrl = `${frontendUrl()}/auth/verify-email?token=${emailVerificationToken}`;
   let emailSent = false;
   try {
-    await emailService.sendEmailVerification(user, verificationUrl);
-    emailSent = true;
+    emailSent = !!(await emailService.sendEmailVerification(user, verificationUrl));
   } catch (error) {
     console.error('Failed to send verification email:', error.message);
   }

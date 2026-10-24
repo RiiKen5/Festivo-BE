@@ -64,3 +64,15 @@ describe('admin growth metrics', () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe('verification email status', () => {
+  it('does not claim the email was sent when SMTP is not configured', async () => {
+    const res = await request(app).post('/api/v1/auth/register').send({
+      email: 'nosmtp@example.com', password: 'Password123', phone: '9876543299', name: 'No Smtp', city: 'Pune'
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.data.emailSent).toBe(false);
+    const health = await request(app).get('/api/v1/health');
+    expect(health.body.email).toBe('not configured');
+  });
+});

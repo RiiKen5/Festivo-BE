@@ -46,6 +46,7 @@ router.get('/health', (req, res) => {
     message: 'Festivo API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
+    email: require('../services/emailService').isConfigured() ? 'configured' : 'not configured',
     database: {
       mongodb: mongoStatus[mongoState] || 'unknown',
       redis: process.env.REDIS_ENABLED === 'true' ? 'enabled' : 'disabled (mock)'

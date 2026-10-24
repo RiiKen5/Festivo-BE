@@ -16,10 +16,17 @@ class EmailService {
     this.from = `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`;
   }
 
+  isConfigured() {
+    return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+  }
+
+  // Resolves to null when nothing was sent, so callers can tell the user
   async sendEmail(options) {
     // Without SMTP settings (local dev, tests) log instead of attempting delivery
-    if (!process.env.SMTP_HOST) {
-      if (process.env.NODE_ENV !== 'test') {
+    if (!this.isConfigured()) {
+      if (process.env.NODE_ENV === 'production') {
+        console.error(`[email NOT sent: SMTP_HOST/SMTP_USER/SMTP_PASS missing] subject="${options.subject}"`);
+      } else if (process.env.NODE_ENV !== 'test') {
         console.log(`[email not sent: SMTP not configured] to=${options.to} subject="${options.subject}"`);
       }
       return null;
