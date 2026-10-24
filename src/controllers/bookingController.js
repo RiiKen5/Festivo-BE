@@ -7,6 +7,7 @@ const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 const checkoutService = require('../services/checkoutService');
 const bookingService = require('../services/bookingService');
+const chatService = require('../services/chatService');
 
 // @desc    Get all bookings (with filters)
 // @route   GET /api/v1/bookings
@@ -54,6 +55,24 @@ exports.getBookings = catchAsync(async (req, res, next) => {
   res.json(
     ApiResponse.paginated(bookings, page, limit, total, 'Bookings retrieved successfully')
   );
+});
+
+// @desc    Bookings between the current user and another user (either side)
+// @route   GET /api/v1/bookings/with/:userId
+// @access  Private
+exports.getBookingsWithUser = catchAsync(async (req, res, next) => {
+  const me = req.user._id;
+  const other = req.params.userId;
+  const bookings = await Booking.find({
+    $or: [{ organizer: me, vendor: other }, { organizer: other, vendor: me }]
+  })
+    .populate('event', 'title date city')
+    .populate('service', 'serviceName category basePrice')
+    .sort('-updatedAt')
+    .limit(20)
+    .lean();
+
+  res.json(ApiResponse.success(bookings, 'Bookings retrieved'));
 });
 
 // @desc    Get single booking
@@ -160,6 +179,9 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     actionUrl: `/bookings/${booking._id}`
   });
 
+  await chatService.postBookingUpdate(booking, req.user._id,
+    `Booking request: ${service.serviceName} on ${bookingDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}, proposed ₹${proposedPrice}`);
+
   // Populate and return
   await booking.populate([
     { path: 'event', select: 'title date city' },
@@ -242,6 +264,9 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
     actionUrl: `/bookings/${booking._id}`
   });
 
+  await chatService.postBookingUpdate(booking, req.user._id,
+    `Accepted at ₹${booking.priceAgreed}. Pay to lock the date.`);
+
   res.json(ApiResponse.success(booking, 'Booking confirmed successfully'));
 });
 
@@ -311,6 +336,8 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
     actionUrl: `/bookings/${booking._id}`
   });
 
+  await chatService.postBookingUpdate(booking, req.user._id, 'Marked the booking as completed');
+
   res.json(ApiResponse.success(booking, 'Booking completed successfully'));
 });
 
@@ -358,6 +385,8 @@ exports.recordPayment = catchAsync(async (req, res, next) => {
     relatedBooking: booking._id,
     actionUrl: `/bookings/${booking._id}`
   });
+
+  await chatService.postBookingUpdate(booking, req.user._id, `Recorded a payment of ₹${amount} received directly`);
 
   res.json(ApiResponse.success(booking, 'Payment recorded successfully'));
 });

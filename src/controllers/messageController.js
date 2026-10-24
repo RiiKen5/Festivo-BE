@@ -1,9 +1,9 @@
 const Message = require('../models/Message');
 const User = require('../models/User');
-const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
+const chatService = require('../services/chatService');
 
 // @desc    Get conversation with a user
 // @route   GET /api/v1/messages/conversation/:userId
@@ -21,8 +21,9 @@ exports.getConversation = catchAsync(async (req, res, next) => {
   const skip = (page - 1) * limit;
   const messages = await Message.getConversation(req.user._id, otherUserId, limit, skip);
 
-  // Mark messages as read
-  await Message.markAsRead(otherUserId, req.user._id);
+  // Mark messages as read, and tell the sender so their ticks update
+  const read = await Message.markAsRead(otherUserId, req.user._id);
+  if (read.modifiedCount) chatService.notifyRead(otherUserId, req.user._id);
 
   // Get total count
   const total = await Message.countDocuments({
@@ -78,26 +79,9 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
     { path: 'receiver', select: 'name profilePhoto' }
   ]);
 
-  // Send notification
-  await Notification.createNotification({
-    recipient: receiverId,
-    type: 'message',
-    title: 'New Message',
-    message: `${req.user.name}: ${messageText.substring(0, 50)}${messageText.length > 50 ? '...' : ''}`,
-    relatedUser: req.user._id,
-    actionUrl: `/messages/${req.user._id}`
-  });
+  // Chat has its own unread badge, so messages don't add bell notifications
 
-  // Emit socket event for real-time
-  try {
-    const socketModule = require('../socket');
-    const io = socketModule.getIO();
-    if (io) {
-      io.to(receiverId).emit('new_message', message);
-    }
-  } catch (error) {
-    // Socket not initialized
-  }
+  chatService.broadcast(message);
 
   res.status(201).json(ApiResponse.success(message, 'Message sent successfully'));
 });
@@ -117,7 +101,8 @@ exports.getConversations = catchAsync(async (req, res, next) => {
 // @route   PUT /api/v1/messages/read/:userId
 // @access  Private
 exports.markAsRead = catchAsync(async (req, res, next) => {
-  await Message.markAsRead(req.params.userId, req.user._id);
+  const read = await Message.markAsRead(req.params.userId, req.user._id);
+  if (read.modifiedCount) chatService.notifyRead(req.params.userId, req.user._id);
 
   res.json(ApiResponse.success(null, 'Messages marked as read'));
 });
@@ -262,15 +247,9 @@ exports.sendMessageWithAttachment = catchAsync(async (req, res, next) => {
     { path: 'receiver', select: 'name profilePhoto' }
   ]);
 
-  // Send notification
-  await Notification.createNotification({
-    recipient: receiverId,
-    type: 'message',
-    title: 'New Message',
-    message: `${req.user.name} sent you ${messageType === 'image' ? 'an image' : 'a file'}`,
-    relatedUser: req.user._id,
-    actionUrl: `/messages/${req.user._id}`
-  });
+  // Chat has its own unread badge, so messages don't add bell notifications
+
+  chatService.broadcast(message);
 
   res.status(201).json(ApiResponse.success(message, 'Message sent successfully'));
 });

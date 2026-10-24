@@ -12,6 +12,7 @@ router.get('/', paginationValidations, validate, bookingController.getBookings);
 router.get('/stats', bookingController.getBookingStats);
 router.get('/vendor/upcoming', bookingController.getVendorUpcomingBookings);
 router.get('/event/:eventId', bookingController.getEventBookings);
+router.get('/with/:userId', paramValidations.userId, validate, bookingController.getBookingsWithUser);
 router.get('/:id', paramValidations.mongoId, validate, bookingController.getBooking);
 
 router.post(

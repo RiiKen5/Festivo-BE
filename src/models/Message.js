@@ -16,12 +16,15 @@ const messageSchema = new mongoose.Schema({
   // Content
   messageText: {
     type: String,
-    required: [true, 'Message text is required'],
+    // Voice notes and files may come without text
+    required: [function () { return !(this.attachments && this.attachments.length); }, 'Message text is required'],
+    default: '',
     maxlength: [5000, 'Message cannot exceed 5000 characters']
   },
   messageType: {
     type: String,
-    enum: ['text', 'image', 'file'],
+    // booking: a status card posted when a booking changes
+    enum: ['text', 'image', 'file', 'voice', 'booking'],
     default: 'text'
   },
   attachments: [String],

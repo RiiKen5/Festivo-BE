@@ -5,6 +5,10 @@ const { corsOrigin } = require('../config/frontend');
 
 let io = null;
 
+// Open connections per user id (a user may have several tabs)
+const online = new Map();
+const isId = (v) => typeof v === 'string' && /^[a-f0-9]{24}$/i.test(v);
+
 const initializeSocket = (server) => {
   io = new Server(server, {
     cors: {
@@ -40,120 +44,50 @@ const initializeSocket = (server) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.user.name} (${socket.user._id})`);
+    const userId = socket.user._id.toString();
 
-    // Join personal room for notifications
-    socket.join(socket.user._id.toString());
+    // Personal room: messages, read receipts and notifications for this user
+    socket.join(userId);
+    const wasOnline = online.has(userId);
+    online.set(userId, (online.get(userId) || 0) + 1);
+    if (!wasOnline) socket.broadcast.emit('user_status_change', { userId, status: 'online' });
 
-    // Handle joining event rooms
     socket.on('join_event', (eventId) => {
-      socket.join(`event:${eventId}`);
-      console.log(`${socket.user.name} joined event room: ${eventId}`);
+      if (isId(eventId)) socket.join(`event:${eventId}`);
     });
 
     socket.on('leave_event', (eventId) => {
-      socket.leave(`event:${eventId}`);
-      console.log(`${socket.user.name} left event room: ${eventId}`);
+      if (isId(eventId)) socket.leave(`event:${eventId}`);
     });
 
-    // Handle joining chat rooms
-    socket.on('join_chat', (otherUserId) => {
-      const roomId = [socket.user._id.toString(), otherUserId].sort().join(':');
-      socket.join(`chat:${roomId}`);
-      console.log(`${socket.user.name} joined chat room: ${roomId}`);
+    // Whether these users have the app open right now
+    socket.on('presence', (userIds, reply) => {
+      if (!Array.isArray(userIds) || typeof reply !== 'function') return;
+      reply(Object.fromEntries(userIds.slice(0, 100).filter(isId).map(id => [id, online.has(id)])));
     });
 
-    socket.on('leave_chat', (otherUserId) => {
-      const roomId = [socket.user._id.toString(), otherUserId].sort().join(':');
-      socket.leave(`chat:${roomId}`);
-    });
-
-    // Handle direct messages
-    socket.on('send_message', (data) => {
-      const { receiverId, message } = data;
-      const roomId = [socket.user._id.toString(), receiverId].sort().join(':');
-
-      // Emit to chat room
-      io.to(`chat:${roomId}`).emit('new_message', {
-        sender: socket.user,
-        message,
-        timestamp: new Date()
-      });
-
-      // Also emit to receiver's personal room for notification
-      io.to(receiverId).emit('message_notification', {
-        sender: socket.user,
-        message: message.substring(0, 50)
-      });
-    });
-
-    // Handle typing indicator
+    // Typing indicator goes straight to the other person; messages
+    // themselves are sent through the REST API so they are saved first
     socket.on('typing_start', (data) => {
-      const { receiverId } = data;
-      const roomId = [socket.user._id.toString(), receiverId].sort().join(':');
-      socket.to(`chat:${roomId}`).emit('user_typing', {
-        userId: socket.user._id,
-        name: socket.user.name
-      });
+      if (data && isId(data.receiverId)) socket.to(data.receiverId).emit('user_typing', { userId });
     });
 
     socket.on('typing_stop', (data) => {
-      const { receiverId } = data;
-      const roomId = [socket.user._id.toString(), receiverId].sort().join(':');
-      socket.to(`chat:${roomId}`).emit('user_stopped_typing', {
-        userId: socket.user._id
-      });
+      if (data && isId(data.receiverId)) socket.to(data.receiverId).emit('user_stopped_typing', { userId });
     });
 
-    // Handle event updates
-    socket.on('event_update', (data) => {
-      const { eventId, update } = data;
-      io.to(`event:${eventId}`).emit('event_updated', {
-        eventId,
-        update,
-        updatedBy: socket.user
-      });
+    socket.on('disconnect', () => {
+      const left = (online.get(userId) || 1) - 1;
+      if (left > 0) {
+        online.set(userId, left);
+      } else {
+        online.delete(userId);
+        socket.broadcast.emit('user_status_change', { userId, status: 'offline' });
+      }
     });
 
-    // Handle task updates
-    socket.on('task_update', (data) => {
-      const { eventId, taskId, update } = data;
-      io.to(`event:${eventId}`).emit('task_updated', {
-        taskId,
-        update,
-        updatedBy: socket.user
-      });
-    });
-
-    // Handle RSVP updates
-    socket.on('rsvp_update', (data) => {
-      const { eventId, rsvp } = data;
-      io.to(`event:${eventId}`).emit('rsvp_updated', {
-        rsvp,
-        user: socket.user
-      });
-    });
-
-    // Handle online status
-    socket.on('user_online', () => {
-      socket.broadcast.emit('user_status_change', {
-        userId: socket.user._id,
-        status: 'online'
-      });
-    });
-
-    // Handle disconnect
-    socket.on('disconnect', (reason) => {
-      console.log(`User disconnected: ${socket.user.name} (${reason})`);
-      socket.broadcast.emit('user_status_change', {
-        userId: socket.user._id,
-        status: 'offline'
-      });
-    });
-
-    // Error handling
     socket.on('error', (error) => {
-      console.error('Socket error:', error);
+      console.error('Socket error:', error.message);
     });
   });
 

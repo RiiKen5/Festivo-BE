@@ -31,7 +31,8 @@ exports.getServices = catchAsync(async (req, res, next) => {
     minRating,
     tags,
     sort = '-ratingAverage',
-    search
+    search,
+    provider
   } = req.query;
 
   // Build query
@@ -39,6 +40,8 @@ exports.getServices = catchAsync(async (req, res, next) => {
 
   if (city) query.city = cityMatch(city);
   if (category) query.category = category;
+  // One vendor's services, e.g. to book them from a chat
+  if (typeof provider === 'string' && /^[a-f0-9]{24}$/i.test(provider)) query.provider = provider;
   if (availability) query.availability = availability;
   if (tags) query.tags = { $in: tags.split(',') };
   if (minRating) query.ratingAverage = { $gte: parseFloat(minRating) };

@@ -48,13 +48,13 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     // 4. Messaging from the booking page
     await ven.page.goto(`${APP}/bookings/${bookingId}`); await settle(ven.page);
     await ven.page.getByRole('button', { name: /Send Message/ }).click(); await settle(ven.page);
-    await ven.page.getByPlaceholder('Type a message...').fill('Hi Rohit! Any flavour preference?');
+    await ven.page.getByPlaceholder('Write a message…').fill('Hi Rohit! Any flavour preference?');
     await ven.page.keyboard.press('Enter'); await step(ven.page, '4_vendor_sent');
     await org.page.goto(`${APP}/messages`); await settle(org.page);
     await org.page.getByText('Priya Cakes').first().click(); await settle(org.page);
-    await org.page.getByPlaceholder('Type a message...').fill('Chocolate please!');
+    await org.page.getByPlaceholder('Write a message…').fill('Chocolate please!');
     await org.page.keyboard.press('Enter'); await step(org.page, '4_org_replied');
-    await ven.page.waitForTimeout(9000); // vendor's open conversation polls for new messages
+    await ven.page.locator('.bubble', { hasText: 'Chocolate please!' }).waitFor({ timeout: 5000 }).catch(() => {}); // arrives live
     await step(ven.page, '4_vendor_sees_reply');
     console.log('   vendor sees reply:', await ven.page.getByText('Chocolate please!').count() > 0);
 

@@ -252,6 +252,11 @@ const paramValidations = {
     param('id')
       .isMongoId()
       .withMessage('Invalid ID')
+  ],
+  userId: [
+    param('userId')
+      .isMongoId()
+      .withMessage('Invalid user ID')
   ]
 };
 

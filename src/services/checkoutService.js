@@ -157,6 +157,9 @@ const applyBookingPayment = async (payment) => {
     relatedBooking: booking._id,
     actionUrl: `/bookings/${booking._id}`
   });
+
+  await require('./chatService').postBookingUpdate(booking, booking.organizer,
+    `Paid ₹${payment.amount} online. Festivo holds it until the job is done.`);
 };
 
 const applyTicketPayment = async (payment) => {

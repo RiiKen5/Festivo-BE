@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const checkoutService = require('./checkoutService');
 const policies = require('../config/policies');
+const chatService = require('./chatService');
 
 /**
  * Cancel a booking, refunding online payments according to the cancellation
@@ -38,6 +39,11 @@ exports.cancelBooking = async (booking, actor, reason) => {
     relatedBooking: booking._id,
     actionUrl: `/bookings/${booking._id}`
   });
+
+  // Admins cancel from outside the conversation; post it as the organizer's side
+  const from = byVendor ? booking.vendor : booking.organizer;
+  await chatService.postBookingUpdate(booking, actor.role === 'admin' ? booking.organizer : from,
+    `Booking cancelled${reason ? `: ${reason}` : ''}${refunded > 0 ? `. ₹${refunded} refunded.` : ''}`);
 
   return refunded;
 };
