@@ -3,7 +3,7 @@
 const BE = require('path').resolve(__dirname, '..');
 const mongoose = require(BE + '/node_modules/mongoose');
 const User = require(BE + '/src/models/User');
-const { chromium, APP, session, login, settle, api } = require('./lib');
+const { chromium, APP, session, login, settle, api, pickCity } = require('./lib');
 
 const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (!ok) process.exitCode = 1; };
 
@@ -29,7 +29,7 @@ const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (
     await page.locator('app-input[formcontrolname=name] input').fill('Meera Balloons');
     await page.locator('app-input[formcontrolname=email] input').fill('meera@test.in');
     await page.locator('app-input[formcontrolname=phone] input').fill('9876500077');
-    await page.locator('app-input[formcontrolname=city] input').fill('Pune');
+    await pickCity(page, 'Pune');
     await page.locator('app-input[formcontrolname=password] input').fill('Password123!');
     await page.locator('input[formcontrolname=acceptTerms]').check();
     const [resp] = await Promise.all([

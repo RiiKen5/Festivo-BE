@@ -34,6 +34,11 @@ const taskSchema = new mongoose.Schema({
     enum: TASK_CATEGORIES,
     required: true
   },
+  // Vendor category this item can be booked from, for planner suggestions
+  serviceCategory: {
+    type: String,
+    enum: ['food', 'decor', 'photography', 'music', 'cleanup', 'entertainment', 'venue', 'other']
+  },
 
   // Status
   status: {

@@ -1,6 +1,6 @@
 // Sign up -> verify -> vendor listing with uploads -> profile/avatar ->
 // change password -> forgot/reset password -> search and filters
-const { chromium, APP, API, session, login, settle } = require('./lib');
+const { chromium, APP, API, session, login, settle, pickCity } = require('./lib');
 const step = async (page, name) => { await settle(page); await page.screenshot({ path: `shots/C_${name}.png`, fullPage: true }); console.log('✓', name); };
 
 (async () => {
@@ -18,7 +18,7 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await f('name').fill('Meera Decor');
     await f('email').fill('meera@test.in');
     await f('phone').fill('9876500009');
-    await f('city').fill('Pune');
+    await pickCity(page, 'Pune');
     await f('password').fill('Password123!');
     await page.locator('.user-type-option').nth(1).click();
     await page.locator('input[formcontrolname=acceptTerms]').check();
@@ -40,8 +40,8 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await page.locator('textarea[formcontrolname=description]').fill('Balloon arches, floral backdrops and table decor for birthdays and baby showers.');
     await page.locator('app-input[formcontrolname=basePrice] input').fill('3500');
     await page.locator('select[formcontrolname=priceUnit]').selectOption('per_event');
-    const cityInput = page.locator('app-input[formcontrolname=city] input');
-    if (!(await cityInput.inputValue())) await cityInput.fill('Pune');
+    const cityInput = page.locator('app-city-select[formcontrolname=city] input');
+    if (!(await cityInput.inputValue())) await pickCity(page, 'Pune');
     await page.locator('app-image-upload input[type=file]').first().setInputFiles('photo.jpg');
     await page.locator('app-image-upload input[type=file]').nth(1).setInputFiles(['photo.jpg', 'photo.jpg']);
     await page.waitForTimeout(2500);

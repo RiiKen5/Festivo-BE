@@ -44,6 +44,7 @@ router.post('/:id/cancel', paramValidations.mongoId, validate, eventController.c
 router.post('/:id/complete', paramValidations.mongoId, validate, eventController.completeEvent);
 
 router.get('/:id/invite', paramValidations.mongoId, validate, eventController.getInvite);
+router.get('/:id/plan', paramValidations.mongoId, validate, eventController.getEventPlan);
 router.post('/:id/invite/regenerate', paramValidations.mongoId, validate, eventController.regenerateInvite);
 
 router.post('/:id/co-organizers', paramValidations.mongoId, validate, eventController.addCoOrganizer);

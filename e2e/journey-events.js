@@ -1,6 +1,6 @@
 // Organizer creates a private event, plans it, invites a guest; attendee buys a
 // paid ticket; organizer checks guests in; organizer cancels with refunds.
-const { chromium, APP, session, login, settle, api, tokenFor } = require('./lib');
+const { chromium, APP, session, login, settle, api, tokenFor, pickCity } = require('./lib');
 const step = async (page, name) => { await settle(page); await page.screenshot({ path: `shots/B_${name}.png`, fullPage: true }); console.log('✓', name); };
 const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().split('T')[0];
 
@@ -20,7 +20,7 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().split('T')[
     await f('date').fill(inDays(15));
     await f('time').fill('20:00');
     await f('locationName').fill('The Flour Works');
-    await f('city').fill('Pune');
+    await pickCity(org.page, 'Pune');
     await f('address').fill('Kalyani Nagar, Pune');
     await f('expectedGuests').fill('12');
     const isPublic = org.page.locator('input[formcontrolname=isPublic]');
@@ -31,12 +31,10 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().split('T')[
     await step(org.page, '1_created');
 
     // 2. Checklist
-    await org.page.getByRole('button', { name: 'Add Task' }).click();
-    await org.page.locator('app-modal input').first().fill('Book a cake');
-    await org.page.locator('app-modal select').first().selectOption({ index: 1 });
-    await org.page.locator('app-modal').getByRole('button', { name: /Save|Add/ }).last().click();
+    await org.page.locator('#planner-add').fill('Book a cake');
+    await org.page.locator('#planner-add').press('Enter');
     await settle(org.page);
-    await org.page.locator('.task-checkbox').first().click();
+    await org.page.locator('.planner .check').first().click();
     await step(org.page, '2_tasks');
 
     // 3. Publish privately and get the invite link

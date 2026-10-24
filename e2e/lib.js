@@ -46,6 +46,13 @@ async function login(page, email, password = 'Password123!') {
   await settle(page);
 }
 
+// City fields are searchable dropdowns: type, then pick the first match
+async function pickCity(page, city, scope = '[formcontrolname=city]') {
+  const input = page.locator(`app-city-select${scope} input`);
+  await input.fill(city);
+  await input.press('Enter');
+}
+
 async function settle(page, ms = 600) {
   await page.waitForLoadState('networkidle').catch(() => {});
   await page.waitForTimeout(ms);
@@ -61,4 +68,4 @@ async function tokenFor(email) {
   return r.data.tokens.accessToken;
 }
 
-module.exports = { chromium, APP, API, session, login, settle, api, tokenFor };
+module.exports = { chromium, APP, API, session, login, settle, api, tokenFor, pickCity };

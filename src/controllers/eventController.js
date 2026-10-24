@@ -19,6 +19,9 @@ const RSVP = require('../models/RSVP');
 const Notification = require('../models/Notification');
 const checkoutService = require('../services/checkoutService');
 const bookingService = require('../services/bookingService');
+const Task = require('../models/Task');
+const Service = require('../models/Service');
+const { checklistFor } = require('../config/planTemplates');
 
 // Fields an organizer may change via PUT /events/:id
 const UPDATABLE_EVENT_FIELDS = [
@@ -133,6 +136,11 @@ exports.createEvent = catchAsync(async (req, res, next) => {
   }
 
   const event = await Event.create(eventData);
+
+  // Start the organizer with a checklist for this kind of event
+  if (req.body.withChecklist !== false) {
+    await Task.insertMany(checklistFor(event, req.user._id));
+  }
 
   // Update user stats
   await User.findByIdAndUpdate(req.user._id, {
@@ -570,6 +578,48 @@ exports.regenerateInvite = catchAsync(async (req, res, next) => {
   await event.save();
 
   res.json(ApiResponse.success(inviteDetails(event), 'Invite link regenerated'));
+});
+
+// @desc    Everything needed to plan an event on one screen: the checklist,
+//          bookings so far, and vendors to suggest for each open item
+// @route   GET /api/v1/events/:id/plan
+// @access  Organizers of the event
+exports.getEventPlan = catchAsync(async (req, res, next) => {
+  const event = await Event.findById(req.params.id);
+  if (!event) return next(new ApiError('Event not found', 404));
+  if (!event.isOrganizedBy(req.user)) return next(new ApiError('Only organizers can see the plan', 403));
+
+  const [tasks, bookings] = await Promise.all([
+    Task.find({ event: event._id, status: { $ne: 'cancelled' } }).sort({ dueDate: 1, createdAt: 1 }).lean(),
+    Booking.find({ event: event._id })
+      .populate('service', 'serviceName category slug')
+      .populate('vendor', 'name profilePhoto')
+      .sort('-createdAt')
+      .lean()
+  ]);
+
+  // Categories already covered by a live booking don't need suggestions
+  const live = ['pending', 'confirmed', 'in_progress', 'completed'];
+  const booked = new Set(bookings.filter(b => live.includes(b.status) && b.service).map(b => b.service.category));
+  const wanted = [...new Set(tasks.filter(t => t.serviceCategory && t.status !== 'done').map(t => t.serviceCategory))]
+    .filter(c => !booked.has(c));
+
+  const suggestions = {};
+  await Promise.all(wanted.map(async (category) => {
+    suggestions[category] = await Service.find({
+      category,
+      isActive: true,
+      provider: { $ne: req.user._id },
+      ...(event.city ? { city: cityMatch(event.city) } : {})
+    })
+      .select('serviceName slug basePrice priceUnit ratingAverage totalRatings isVerified coverImage city provider')
+      .populate('provider', 'name profilePhoto')
+      .sort({ isVerified: -1, ratingAverage: -1, completedBookings: -1 })
+      .limit(3)
+      .lean();
+  }));
+
+  res.json(ApiResponse.success({ tasks, bookings, suggestions }, 'Event plan retrieved'));
 });
 
 const inviteDetails = (event) => ({
