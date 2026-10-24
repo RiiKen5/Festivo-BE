@@ -66,3 +66,32 @@ describe('booking updates in chat', () => {
     expect(msg.readAt).toBeTruthy();
   });
 });
+
+describe('voice messages', () => {
+  it('are sent as a voice message and only the two people can play them', async () => {
+    const { organizer, vendor } = await setup();
+    const stranger = await createUser();
+    const sent = await request(app).post('/api/v1/messages/voice').set(auth(organizer.token))
+      .field('receiverId', String(vendor.user._id)).field('durationSec', '7')
+      .attach('audio', Buffer.from('fake-webm-audio'), { filename: 'note.webm', contentType: 'audio/webm' });
+    expect(sent.status).toBe(201);
+    expect(sent.body.data.messageType).toBe('voice');
+    const path = sent.body.data.attachments[0];
+    expect(path).toMatch(/^\/messages\/voice\/[a-f0-9]{24}\?d=7$/);
+
+    const url = '/api/v1' + path.split('?')[0];
+    const heard = await request(app).get(url).set(auth(vendor.token));
+    expect(heard.status).toBe(200);
+    expect(heard.headers['content-type']).toMatch(/audio\/webm/);
+    expect((await request(app).get(url).set(auth(stranger.token))).status).toBe(404);
+    expect((await request(app).get(url)).status).toBe(401);
+  });
+
+  it('rejects files that are not audio', async () => {
+    const { organizer, vendor } = await setup();
+    const res = await request(app).post('/api/v1/messages/voice').set(auth(organizer.token))
+      .field('receiverId', String(vendor.user._id))
+      .attach('audio', Buffer.from('<script>'), { filename: 'x.html', contentType: 'text/html' });
+    expect(res.status).toBe(400);
+  });
+});

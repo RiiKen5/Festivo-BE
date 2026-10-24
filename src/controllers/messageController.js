@@ -4,6 +4,7 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 const chatService = require('../services/chatService');
+const VoiceNote = require('../models/VoiceNote');
 
 // @desc    Get conversation with a user
 // @route   GET /api/v1/messages/conversation/:userId
@@ -252,4 +253,64 @@ exports.sendMessageWithAttachment = catchAsync(async (req, res, next) => {
   chatService.broadcast(message);
 
   res.status(201).json(ApiResponse.success(message, 'Message sent successfully'));
+});
+
+// Browsers record in different formats (Chrome/Firefox: webm/ogg, Safari: mp4)
+const VOICE_TYPES = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/mpeg', 'audio/aac', 'audio/x-m4a', 'audio/wav'];
+const MAX_VOICE_SECONDS = 120;
+
+exports.acceptVoice = require('multer')({
+  storage: require('multer').memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (VOICE_TYPES.includes(file.mimetype.split(';')[0])) return cb(null, true);
+    cb(new ApiError('Unsupported audio format', 400));
+  }
+}).single('audio');
+
+// @desc    Send a voice message
+// @route   POST /api/v1/messages/voice   (multipart: audio, receiverId, durationSec)
+// @access  Private
+exports.sendVoiceMessage = catchAsync(async (req, res, next) => {
+  const { receiverId } = req.body;
+  if (!req.file) return next(new ApiError('No recording received', 400));
+  if (!require('mongoose').isValidObjectId(receiverId) || receiverId === req.user._id.toString()) {
+    return next(new ApiError('Invalid receiver', 400));
+  }
+  if (!(await User.exists({ _id: receiverId }))) return next(new ApiError('Receiver not found', 404));
+
+  const duration = Math.min(MAX_VOICE_SECONDS, Math.max(0, Math.round(Number(req.body.durationSec) || 0)));
+  const note = await VoiceNote.create({
+    data: req.file.buffer,
+    contentType: req.file.mimetype.split(';')[0],
+    size: req.file.size,
+    durationSec: duration,
+    sender: req.user._id,
+    receiver: receiverId
+  });
+
+  const message = await Message.create({
+    sender: req.user._id,
+    receiver: receiverId,
+    messageText: '',
+    messageType: 'voice',
+    attachments: [`/messages/voice/${note._id}?d=${duration}`]
+  });
+  await message.populate(chatService.POPULATE);
+  chatService.broadcast(message);
+
+  res.status(201).json(ApiResponse.success(message, 'Voice message sent'));
+});
+
+// @desc    Play a voice message (only the two people in the conversation)
+// @route   GET /api/v1/messages/voice/:id
+// @access  Private
+exports.getVoiceNote = catchAsync(async (req, res, next) => {
+  const note = await VoiceNote.findById(req.params.id).lean();
+  const me = req.user._id.toString();
+  if (!note || (note.sender.toString() !== me && note.receiver.toString() !== me)) {
+    return next(new ApiError('Voice message not found', 404));
+  }
+  res.set({ 'Content-Type': note.contentType, 'Cache-Control': 'private, max-age=86400' });
+  res.send(note.data.buffer ? Buffer.from(note.data.buffer) : note.data);
 });

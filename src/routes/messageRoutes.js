@@ -23,6 +23,8 @@ router.post(
 );
 
 router.post('/with-attachment', messageLimiter, messageController.sendMessageWithAttachment);
+router.post('/voice', messageLimiter, messageController.acceptVoice, messageController.sendVoiceMessage);
+router.get('/voice/:id', paramValidations.mongoId, validate, messageController.getVoiceNote);
 
 router.put('/read/:userId', messageController.markAsRead);
 router.delete('/:id', paramValidations.mongoId, validate, messageController.deleteMessage);
