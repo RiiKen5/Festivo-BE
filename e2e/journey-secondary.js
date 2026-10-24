@@ -22,11 +22,11 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     const org = await session(browser, 'rohit'); issues.push(org.issues);
     await login(org.page, 'rohit@test.in');
     await org.page.goto(`${APP}/bookings/${b.data._id}`); await settle(org.page);
-    await org.page.getByRole('button', { name: /securely/ }).click(); await settle(org.page);
+    await org.page.getByRole('button', { name: /^Pay ₹/ }).click(); await settle(org.page);
     const ven = await session(browser, 'priya'); issues.push(ven.issues);
     await login(ven.page, 'priya@test.in');
     await ven.page.goto(`${APP}/bookings/${b.data._id}`); await settle(ven.page);
-    await ven.page.getByRole('button', { name: 'Cancel Booking' }).first().click();
+    await ven.page.getByRole('button', { name: /Cancel booking|Decline request/ }).first().click();
     await ven.page.locator('app-modal textarea').fill('Oven broke down, very sorry');
     await ven.page.locator('app-modal').getByRole('button', { name: 'Cancel Booking' }).click();
     await step(ven.page, '1_vendor_cancelled');

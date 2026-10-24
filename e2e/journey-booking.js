@@ -21,7 +21,7 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await org.page.locator('app-modal input[type=number]').first().fill('1800');
     await org.page.locator('app-modal textarea').first().fill('Chocolate truffle, 2kg, "Happy 30th Rohit"');
     await step(org.page, '1_booking_form');
-    await org.page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await org.page.getByRole('button', { name: 'Send request' }).click();
     await org.page.waitForURL(/\/bookings/, { timeout: 8000 });
     await step(org.page, '1_after_booking');
 
@@ -31,16 +31,16 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await ven.page.goto(`${APP}/bookings`); await step(ven.page, '2_vendor_bookings');
     const bookingId = (await api('/bookings?role=vendor', { token: await tokenFor('priya@test.in') })).data[0]._id;
     await ven.page.goto(`${APP}/bookings/${bookingId}`); await step(ven.page, '2_vendor_booking_detail');
-    await ven.page.getByRole('button', { name: /Confirm/ }).first().click();
+    await ven.page.getByRole('button', { name: /Accept & send price/ }).first().click();
     await ven.page.locator('app-modal input[type=number]').fill('2000');
-    await ven.page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await ven.page.getByRole('button', { name: 'Accept booking' }).click();
     await step(ven.page, '2_vendor_confirmed');
 
     // 3. Organizer pays 30% advance, then the balance
     await org.page.goto(`${APP}/bookings/${bookingId}`); await step(org.page, '3_org_confirmed_view');
     await org.page.getByRole('button', { name: /advance/ }).click();
     await step(org.page, '3_after_advance');
-    await org.page.getByRole('button', { name: /securely/ }).click();
+    await org.page.getByRole('button', { name: /^Pay ₹/ }).click();
     await step(org.page, '3_after_balance');
     const b = (await api(`/bookings/${bookingId}`, { token: await tokenFor('rohit@test.in') })).data;
     console.log('   booking payment:', b.paymentStatus, b.pricePaid, '/', b.priceAgreed);
@@ -60,7 +60,7 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
 
     // 5. Organizer completes and reviews
     await org.page.goto(`${APP}/bookings/${bookingId}`); await settle(org.page);
-    await org.page.getByRole('button', { name: /Mark Complete/ }).click(); await step(org.page, '5_completed');
+    await org.page.getByRole('button', { name: /Mark as done/ }).first().click(); await step(org.page, '5_completed');
     await org.page.getByRole('button', { name: /Leave a Review/ }).click(); await settle(org.page);
     await step(org.page, '5_review_modal');
     await org.page.locator('app-modal .star, app-modal [class*=star]').nth(4).click().catch(e => console.log('   star click:', e.message.split('\n')[0]));

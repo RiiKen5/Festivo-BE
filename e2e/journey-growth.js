@@ -24,7 +24,7 @@ const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (
     await page.getByRole('button', { name: /List your service, free/ }).first().click();
     await page.waitForURL(/\/auth\/register\?as=vendor/);
     await settle(page);
-    check((await page.locator('.user-type-option--selected').innerText()).includes('Offer Services'), 'register preselects "Offer Services"');
+    check((await page.locator('.user-type-option--selected').innerText()).includes('Offer my services'), 'register preselects "Offer my services"');
 
     await page.locator('app-input[formcontrolname=name] input').fill('Meera Balloons');
     await page.locator('app-input[formcontrolname=email] input').fill('meera@test.in');
