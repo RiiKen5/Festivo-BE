@@ -10,7 +10,12 @@ class EmailService {
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
-      }
+      },
+      // Signup waits for the verification email, so fail fast instead of
+      // nodemailer's 2-minute default when the mail server is unreachable
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000
     });
 
     this.from = `${process.env.FROM_NAME} <${process.env.FROM_EMAIL}>`;
