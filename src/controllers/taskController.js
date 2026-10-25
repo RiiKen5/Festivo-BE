@@ -23,7 +23,7 @@ exports.getEventTasks = catchAsync(async (req, res, next) => {
     req.user.role === 'admin';
 
   if (!isAuthorized) {
-    return next(new ApiError('Not authorized to view tasks for this event', 403));
+    return next(new ApiError('Only the organizers can see this checklist', 403));
   }
 
   const query = { event: req.params.eventId };
@@ -39,7 +39,7 @@ exports.getEventTasks = catchAsync(async (req, res, next) => {
     .sort(sort)
     .lean();
 
-  res.json(ApiResponse.success(tasks, 'Tasks retrieved successfully'));
+  res.json(ApiResponse.success(tasks, 'Checklist retrieved'));
 });
 
 // @desc    Get single task
@@ -53,7 +53,7 @@ exports.getTask = catchAsync(async (req, res, next) => {
     .populate('linkedBooking');
 
   if (!task) {
-    return next(new ApiError('Task not found', 404));
+    return next(new ApiError('Checklist item not found', 404));
   }
 
   // Check authorization
@@ -65,10 +65,10 @@ exports.getTask = catchAsync(async (req, res, next) => {
     req.user.role === 'admin';
 
   if (!isAuthorized) {
-    return next(new ApiError('Not authorized to view this task', 403));
+    return next(new ApiError('You cannot see this checklist item', 403));
   }
 
-  res.json(ApiResponse.success(task, 'Task retrieved successfully'));
+  res.json(ApiResponse.success(task, 'Checklist item retrieved'));
 });
 
 // @desc    Create task
@@ -88,7 +88,7 @@ exports.createTask = catchAsync(async (req, res, next) => {
     event.coOrganizers.includes(req.user._id);
 
   if (!isAuthorized) {
-    return next(new ApiError('Not authorized to create tasks for this event', 403));
+    return next(new ApiError('Only the organizers can add to this checklist', 403));
   }
 
   const task = await Task.create({
@@ -109,8 +109,8 @@ exports.createTask = catchAsync(async (req, res, next) => {
     await Notification.createNotification({
       recipient: assignedTo,
       type: 'task_assigned',
-      title: 'Task Assigned',
-      message: `You have been assigned a new task: ${taskName}`,
+      title: 'Added to your to-do list',
+      message: `You've been asked to: ${taskName}`,
       relatedEvent: eventId,
       actionUrl: `/events/${eventId}`
     });
@@ -118,7 +118,7 @@ exports.createTask = catchAsync(async (req, res, next) => {
 
   await task.populate('assignedTo', 'name profilePhoto');
 
-  res.status(201).json(ApiResponse.success(task, 'Task created successfully'));
+  res.status(201).json(ApiResponse.success(task, 'Added to the checklist'));
 });
 
 // @desc    Update task
@@ -128,7 +128,7 @@ exports.updateTask = catchAsync(async (req, res, next) => {
   let task = await Task.findById(req.params.id).populate('event');
 
   if (!task) {
-    return next(new ApiError('Task not found', 404));
+    return next(new ApiError('Checklist item not found', 404));
   }
 
   // Check authorization
@@ -139,7 +139,7 @@ exports.updateTask = catchAsync(async (req, res, next) => {
     task.assignedTo?.toString() === req.user._id.toString();
 
   if (!isAuthorized) {
-    return next(new ApiError('Not authorized to update this task', 403));
+    return next(new ApiError('You cannot change this checklist item', 403));
   }
 
   // If assigning to new user, notify them
@@ -155,14 +155,14 @@ exports.updateTask = catchAsync(async (req, res, next) => {
     await Notification.createNotification({
       recipient: req.body.assignedTo,
       type: 'task_assigned',
-      title: 'Task Assigned',
+      title: 'Added to your to-do list',
       message: `You have been assigned a task: ${task.taskName}`,
       relatedEvent: task.event._id || task.event,
       actionUrl: `/events/${task.event._id || task.event}`
     });
   }
 
-  res.json(ApiResponse.success(task, 'Task updated successfully'));
+  res.json(ApiResponse.success(task, 'Checklist item updated'));
 });
 
 // @desc    Delete task
@@ -172,7 +172,7 @@ exports.deleteTask = catchAsync(async (req, res, next) => {
   const task = await Task.findById(req.params.id).populate('event');
 
   if (!task) {
-    return next(new ApiError('Task not found', 404));
+    return next(new ApiError('Checklist item not found', 404));
   }
 
   // Only event organizer can delete
@@ -182,7 +182,7 @@ exports.deleteTask = catchAsync(async (req, res, next) => {
 
   await Task.findByIdAndDelete(req.params.id);
 
-  res.json(ApiResponse.success(null, 'Task deleted successfully'));
+  res.json(ApiResponse.success(null, 'Removed from the checklist'));
 });
 
 // @desc    Update task status
@@ -193,7 +193,7 @@ exports.updateTaskStatus = catchAsync(async (req, res, next) => {
   const task = await Task.findById(req.params.id).populate('event');
 
   if (!task) {
-    return next(new ApiError('Task not found', 404));
+    return next(new ApiError('Checklist item not found', 404));
   }
 
   // Check authorization
@@ -204,13 +204,13 @@ exports.updateTaskStatus = catchAsync(async (req, res, next) => {
     task.assignedTo?.toString() === req.user._id.toString();
 
   if (!isAuthorized) {
-    return next(new ApiError('Not authorized to update this task', 403));
+    return next(new ApiError('You cannot change this checklist item', 403));
   }
 
   task.status = status;
   await task.save();
 
-  res.json(ApiResponse.success(task, 'Task status updated successfully'));
+  res.json(ApiResponse.success(task, 'Checklist item updated'));
 });
 
 // @desc    Get my assigned tasks
@@ -305,7 +305,7 @@ exports.getTaskSummary = catchAsync(async (req, res, next) => {
   res.json(
     ApiResponse.success(
       { byStatus: summary, byCategory, overdueCount },
-      'Task summary retrieved'
+      'Checklist summary retrieved'
     )
   );
 });
@@ -317,7 +317,7 @@ exports.bulkUpdateTasks = catchAsync(async (req, res, next) => {
   const { taskIds, updates } = req.body;
 
   if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
-    return next(new ApiError('Task IDs required', 400));
+    return next(new ApiError('Choose the checklist items to reorder', 400));
   }
 
   // Verify all tasks belong to user's events
