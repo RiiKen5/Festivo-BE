@@ -22,6 +22,7 @@ const bookingService = require('../services/bookingService');
 const Task = require('../models/Task');
 const Service = require('../models/Service');
 const { checklistFor } = require('../config/planTemplates');
+const availability = require('../services/availabilityService');
 
 // Fields an organizer may change via PUT /events/:id
 const UPDATABLE_EVENT_FIELDS = [
@@ -606,17 +607,24 @@ exports.getEventPlan = catchAsync(async (req, res, next) => {
 
   const suggestions = {};
   await Promise.all(wanted.map(async (category) => {
-    suggestions[category] = await Service.find({
+    const candidates = await Service.find({
       category,
       isActive: true,
       provider: { $ne: req.user._id },
       ...(event.city ? { city: cityMatch(event.city) } : {})
     })
-      .select('serviceName slug basePrice priceUnit ratingAverage totalRatings isVerified coverImage city provider')
+      .select('serviceName slug basePrice priceUnit ratingAverage totalRatings isVerified coverImage city provider category dailyCapacity availability')
       .populate('provider', 'name profilePhoto')
       .sort({ isVerified: -1, ratingAverage: -1, completedBookings: -1 })
-      .limit(3)
+      .limit(10)
       .lean();
+    // Only vendors who are free on the event date
+    const free = [];
+    for (const service of candidates) {
+      if (free.length === 3) break;
+      if ((await availability.check(service, event.date)).available) free.push(service);
+    }
+    suggestions[category] = free;
   }));
 
   res.json(ApiResponse.success({ tasks, bookings, suggestions }, 'Event plan retrieved'));

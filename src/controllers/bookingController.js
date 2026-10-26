@@ -8,6 +8,14 @@ const ApiResponse = require('../utils/apiResponse');
 const checkoutService = require('../services/checkoutService');
 const bookingService = require('../services/bookingService');
 const chatService = require('../services/chatService');
+const availability = require('../services/availabilityService');
+
+const prettyDay = (date) => new Date(date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
+const UNAVAILABLE = {
+  paused: (name) => `${name} isn't taking bookings right now`,
+  blocked: (name, day) => `${name} isn't available on ${day}. Please pick another date.`,
+  full: (name, day) => `${name} is already booked on ${day}. Please pick another date.`
+};
 
 // @desc    Get all bookings (with filters)
 // @route   GET /api/v1/bookings
@@ -137,8 +145,9 @@ exports.createBooking = catchAsync(async (req, res, next) => {
 
   // Check if service is available on the date
   const bookingDate = new Date(eventDate || event.date);
-  if (service.availability !== 'available' || service.isBlackedOut(bookingDate)) {
-    return next(new ApiError('This service is not available on that date', 400));
+  const open = await availability.check(service, bookingDate);
+  if (!open.available) {
+    return next(new ApiError(UNAVAILABLE[open.reason](service.serviceName, prettyDay(bookingDate)), 409, { reason: open.reason }));
   }
 
   // Check for existing booking
@@ -241,6 +250,20 @@ exports.confirmBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('Booking is not pending', 400));
   }
 
+  // Warn before taking more bookings than the vendor said they can handle;
+  // the vendor may accept anyway (allowOverbook) after seeing the warning
+  if (!req.body.allowOverbook) {
+    const service = await Service.findById(booking.service);
+    const open = service ? await availability.check(service, booking.eventDate, { excludeBookingId: booking._id }) : { available: true };
+    if (!open.available && open.reason !== 'paused') {
+      const day = prettyDay(booking.eventDate);
+      const message = open.reason === 'blocked'
+        ? `You've blocked ${day} in your calendar.`
+        : `You already have ${open.count} booking${open.count === 1 ? '' : 's'} on ${day} (your limit is ${open.capacity} a day).`;
+      return next(new ApiError(message, 409, { reason: open.reason, canOverride: true }));
+    }
+  }
+
   // Vendor can confirm at a revised price (their quote)
   const { priceAgreed } = req.body;
   if (priceAgreed !== undefined) {
@@ -337,6 +360,7 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
   });
 
   await chatService.postBookingUpdate(booking, req.user._id, 'Marked the booking as completed');
+  await require('../services/reviewRequestService').requestReview(booking._id);
 
   res.json(ApiResponse.success(booking, 'Booking completed successfully'));
 });

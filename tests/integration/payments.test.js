@@ -243,7 +243,7 @@ describe('booking availability', () => {
 
     const blocked = await request(app).post('/api/v1/bookings').set(auth(organizer.token))
       .send({ eventId: event._id, serviceId: service._id });
-    expect(blocked.status).toBe(400);
+    expect(blocked.status).toBe(409);
 
     const own = await createService(organizer.user);
     const self = await request(app).post('/api/v1/bookings').set(auth(organizer.token))

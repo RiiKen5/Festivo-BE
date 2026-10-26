@@ -2,6 +2,7 @@ const Booking = require('../models/Booking');
 const Event = require('../models/Event');
 const Notification = require('../models/Notification');
 const checkoutService = require('../services/checkoutService');
+const reviewRequests = require('../services/reviewRequestService');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -21,6 +22,7 @@ const completeOverdueBookings = async (now = new Date()) => {
     booking.completedAt = now;
     await booking.save();
     await checkoutService.releaseBookingPayouts(booking._id);
+    await reviewRequests.requestReview(booking._id);
 
     const message = 'This booking was automatically marked complete after the event date.';
     for (const recipient of [booking.organizer, booking.vendor]) {
@@ -54,7 +56,8 @@ const completePastEvents = async (now = new Date()) => {
 
 const run = async () => {
   try {
-    const [bookings, events] = await Promise.all([completeOverdueBookings(), completePastEvents()]);
+    const [bookings, events, reminders] = await Promise.all([completeOverdueBookings(), completePastEvents(), reviewRequests.sendDueReminders()]);
+    if (reminders) console.log(`[auto-complete] ${reminders} review reminder(s) sent`);
     if (bookings || events) {
       console.log(`[auto-complete] ${bookings} booking(s), ${events} event(s) completed`);
     }

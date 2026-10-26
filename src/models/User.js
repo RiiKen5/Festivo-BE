@@ -138,6 +138,12 @@ const userSchema = new mongoose.Schema({
     push: { type: Boolean, default: true }
   },
 
+  // Days a vendor can't take bookings (IST, 'YYYY-MM-DD')
+  blockedDays: {
+    type: [String],
+    default: undefined
+  },
+
   // Where the platform sends this user's vendor/ticket earnings
   payoutDetails: {
     type: new mongoose.Schema({

@@ -368,3 +368,39 @@ exports.getVendors = catchAsync(async (req, res, next) => {
     ApiResponse.paginated(vendors, page, limit, total, 'Vendors retrieved successfully')
   );
 });
+
+// @desc    The vendor's month: blocked days and bookings per day
+// @route   GET /api/v1/users/me/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD
+// @access  Private
+exports.getMyCalendar = catchAsync(async (req, res, next) => {
+  const availability = require('../services/availabilityService');
+  const { from, to } = req.query;
+  if (!availability.isDayKey(from) || !availability.isDayKey(to) || to < from) {
+    return next(new ApiError('Use from and to as YYYY-MM-DD', 400));
+  }
+  if ((new Date(to) - new Date(from)) / 864e5 > 62) return next(new ApiError('Ask for at most two months at a time', 400));
+  res.json(ApiResponse.success(await availability.vendorCalendar(req.user._id, from, to), 'Calendar retrieved'));
+});
+
+// @desc    Block or unblock days (whole days, IST)
+// @route   PUT /api/v1/users/me/calendar   { block: [...], unblock: [...] }
+// @access  Private
+exports.updateMyCalendar = catchAsync(async (req, res, next) => {
+  const availability = require('../services/availabilityService');
+  const { block = [], unblock = [] } = req.body;
+  if (!Array.isArray(block) || !Array.isArray(unblock) || block.length + unblock.length > 200) {
+    return next(new ApiError('Send the days to block and unblock as lists', 400));
+  }
+  if (![...block, ...unblock].every(availability.isDayKey)) {
+    return next(new ApiError('Days must be YYYY-MM-DD', 400));
+  }
+  const today = availability.dayKey(new Date());
+  const user = await User.findById(req.user._id).select('blockedDays');
+  const days = new Set((user.blockedDays || []).filter(d => d >= today)); // drop past days
+  block.filter(d => d >= today).forEach(d => days.add(d));
+  unblock.forEach(d => days.delete(d));
+  if (days.size > 366) return next(new ApiError('You can block up to a year of days', 400));
+  user.blockedDays = [...days].sort();
+  await user.save({ validateBeforeSave: false });
+  res.json(ApiResponse.success({ blocked: user.blockedDays }, 'Calendar updated'));
+});

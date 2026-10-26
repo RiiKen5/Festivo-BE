@@ -4,6 +4,7 @@ const Notification = require('../models/Notification');
 const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
+const availability = require('../services/availabilityService');
 const { filterObject, cityMatch } = require('../utils/helpers');
 
 // Fields a vendor may set on their own service. Verification, ratings and
@@ -11,7 +12,7 @@ const { filterObject, cityMatch } = require('../utils/helpers');
 const EDITABLE_SERVICE_FIELDS = [
   'serviceName', 'category', 'description', 'basePrice', 'priceUnit',
   'portfolioImages', 'portfolioVideos', 'coverImage', 'city', 'serviceAreas',
-  'availability', 'availableDates', 'blackoutDates', 'tags', 'businessName',
+  'availability', 'availableDates', 'blackoutDates', 'dailyCapacity', 'tags', 'businessName',
   'gstNumber', 'panNumber', 'metaTitle', 'metaDescription', 'isActive'
 ];
 const { clearCache } = require('../middlewares/cache');
@@ -385,31 +386,23 @@ exports.getServiceStats = catchAsync(async (req, res, next) => {
 // @route   GET /api/v1/services/:id/check-availability
 // @access  Public
 exports.checkAvailability = catchAsync(async (req, res, next) => {
-  const { date } = req.query;
+  const { date, from, to } = req.query;
   const service = await Service.findById(req.params.id);
+  if (!service) return next(new ApiError('Service not found', 404));
 
-  if (!service) {
-    return next(new ApiError('Service not found', 404));
+  // A range: days that can't be booked, for date pickers
+  if (from || to) {
+    if (!availability.isDayKey(from) || !availability.isDayKey(to) || to < from) {
+      return next(new ApiError('Use from and to as YYYY-MM-DD', 400));
+    }
+    const span = (new Date(to) - new Date(from)) / 864e5;
+    if (span > 120) return next(new ApiError('Ask for at most 120 days at a time', 400));
+    const days = await availability.unavailableDays(service, from, to);
+    return res.json(ApiResponse.success({ ...days, paused: service.availability !== 'available' }, 'Availability retrieved'));
   }
 
-  if (!date) {
-    return next(new ApiError('Date required', 400));
-  }
-
-  const checkDate = new Date(date);
-
-  // Check if date is in blackout dates
-  const isBlackout = service.blackoutDates.some(
-    d => d.toDateString() === checkDate.toDateString()
-  );
-
-  // Check if service is available
-  const isAvailable = service.availability === 'available' && !isBlackout;
-
-  res.json(
-    ApiResponse.success(
-      { isAvailable, date: checkDate },
-      isAvailable ? 'Service is available on this date' : 'Service is not available on this date'
-    )
-  );
+  if (!date || isNaN(new Date(date))) return next(new ApiError('Date required', 400));
+  const result = await availability.check(service, date);
+  res.json(ApiResponse.success({ isAvailable: result.available, reason: result.reason, date },
+    result.available ? 'Available on this date' : 'Not available on this date'));
 });

@@ -89,6 +89,9 @@ const serviceSchema = new mongoose.Schema({
     default: 'available'
   },
   availableDates: [Date],
+  // Accepted bookings this service can take on one day; 0 = no limit.
+  // Unset means the default for the category (see availabilityService).
+  dailyCapacity: { type: Number, min: 0, max: 50 },
   blackoutDates: [Date],
 
   // Stats

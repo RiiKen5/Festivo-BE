@@ -110,6 +110,9 @@ const bookingSchema = new mongoose.Schema({
     maxlength: [1000, 'Review cannot exceed 1000 characters']
   },
   reviewDate: Date,
+  // When the organizer was asked for a review, and reminded
+  reviewRequestedAt: Date,
+  reviewReminderSentAt: Date,
 
   // Communication
   lastMessageAt: Date,

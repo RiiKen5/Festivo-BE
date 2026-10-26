@@ -198,6 +198,28 @@ class EmailService {
     });
   }
 
+  async sendReviewRequest(organizer, vendorName, serviceName, link, reminder = false) {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #9e3f68;">How was ${vendorName}?</h1>
+        <p>Hi ${organizer.name},</p>
+        <p>Your booking${serviceName ? ` for ${serviceName}` : ''} is complete. A quick rating takes less than a minute and helps
+          other people choose, and helps good vendors get more bookings.</p>
+        <a href="${link}"
+           style="display: inline-block; background: #9e3f68; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
+          Leave a review
+        </a>
+        <p style="color: #666;">Thank you for planning with Festivo.</p>
+      </div>
+    `;
+
+    return this.sendEmail({
+      to: organizer.email,
+      subject: reminder ? `Reminder: how was ${vendorName}? - Festivo` : `How was ${vendorName}? - Festivo`,
+      html
+    });
+  }
+
   async sendNewBookingRequestToVendor(booking, organizer, service, event) {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

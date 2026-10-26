@@ -17,6 +17,8 @@ router.get('/me', userController.getMe);
 router.put('/me', userController.updateMe);
 router.get('/me/payout-details', userController.getPayoutDetails);
 router.put('/me/payout-details', userController.updatePayoutDetails);
+router.get('/me/calendar', userController.getMyCalendar);
+router.put('/me/calendar', userController.updateMyCalendar);
 router.put('/update-password', userController.updatePassword);
 router.get('/search', userController.searchUsers);
 router.get('/nearby', userController.getNearbyUsers);
