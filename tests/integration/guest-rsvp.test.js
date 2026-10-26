@@ -64,12 +64,12 @@ describe('RSVP without an account', () => {
     expect((await request(app).get(`/api/v1/rsvps/guest?token=${token}`)).status).toBe(404);
   });
 
-  it('keeps tickets behind sign-in, respects capacity and rejects bad input', async () => {
+  it('needs a phone number to buy a ticket, respects capacity and rejects bad input', async () => {
     const host = await createUser();
     const paid = await createEvent(host.user, { isPublic: true, isPublished: true, entryFee: 499, isPaid: true });
     const p = await rsvp({ eventId: paid._id, name: 'Asha' });
     expect(p.status).toBe(400);
-    expect(p.body.error.message).toMatch(/sign in to buy/);
+    expect(p.body.error.message).toMatch(/mobile number to buy a ticket/);
 
     const small = await createEvent(host.user, { isPublic: true, isPublished: true, maxAttendees: 2 });
     expect((await rsvp({ eventId: small._id, name: 'Big family', guestsCount: 2 })).status).toBe(400);

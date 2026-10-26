@@ -17,6 +17,9 @@ const EDITABLE_SERVICE_FIELDS = [
 ];
 const { clearCache } = require('../middlewares/cache');
 
+// Vendors with verified no-shows always rank below everyone else
+const ranked = (sort) => `noShowCount ${typeof sort === 'string' ? sort : '-ratingAverage'}`;
+
 // @desc    Get all services with filters
 // @route   GET /api/v1/services
 // @access  Public
@@ -62,7 +65,7 @@ exports.getServices = catchAsync(async (req, res, next) => {
   // Execute query
   const services = await Service.find(query)
     .populate('provider', 'name profilePhoto ratingAverage')
-    .sort(sort)
+    .sort(ranked(sort))
     .limit(limit * 1)
     .skip((page - 1) * limit)
     .lean();
@@ -262,7 +265,7 @@ exports.getServicesByCategory = catchAsync(async (req, res, next) => {
 
   const services = await Service.find(query)
     .populate('provider', 'name profilePhoto ratingAverage')
-    .sort(sort)
+    .sort(ranked(sort))
     .limit(limit * 1)
     .skip((page - 1) * limit)
     .lean();
@@ -324,7 +327,7 @@ exports.getTopRatedServices = catchAsync(async (req, res, next) => {
 
   const services = await Service.find(query)
     .populate('provider', 'name profilePhoto')
-    .sort('-ratingAverage')
+    .sort(ranked('-ratingAverage'))
     .limit(parseInt(limit))
     .lean();
 

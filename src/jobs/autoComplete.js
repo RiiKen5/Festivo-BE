@@ -3,6 +3,7 @@ const Event = require('../models/Event');
 const Notification = require('../models/Notification');
 const checkoutService = require('../services/checkoutService');
 const reviewRequests = require('../services/reviewRequestService');
+const disputeService = require('../services/disputeService');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -14,7 +15,9 @@ const EVENT_GRACE_DAYS = 1;
 const completeOverdueBookings = async (now = new Date()) => {
   const bookings = await Booking.find({
     status: { $in: ['confirmed', 'in_progress'] },
-    eventDate: { $lt: new Date(now - BOOKING_GRACE_DAYS * DAY) }
+    eventDate: { $lt: new Date(now - BOOKING_GRACE_DAYS * DAY) },
+    // A reported problem keeps the payout frozen until it is settled
+    'dispute.status': { $ne: 'open' }
   });
 
   for (const booking of bookings) {
@@ -56,8 +59,11 @@ const completePastEvents = async (now = new Date()) => {
 
 const run = async () => {
   try {
-    const [bookings, events, reminders] = await Promise.all([completeOverdueBookings(), completePastEvents(), reviewRequests.sendDueReminders()]);
+    const [bookings, events, reminders, disputes] = await Promise.all([
+      completeOverdueBookings(), completePastEvents(), reviewRequests.sendDueReminders(), disputeService.resolveOverdue()
+    ]);
     if (reminders) console.log(`[auto-complete] ${reminders} review reminder(s) sent`);
+    if (disputes) console.log(`[auto-complete] ${disputes} unanswered problem report(s) refunded`);
     if (bookings || events) {
       console.log(`[auto-complete] ${bookings} booking(s), ${events} event(s) completed`);
     }

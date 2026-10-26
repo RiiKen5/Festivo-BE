@@ -159,7 +159,7 @@ exports.updateRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('RSVP not found', 404));
   }
 
-  if (rsvp.attendee.toString() !== req.user._id.toString()) {
+  if (String(rsvp.attendee) !== String(req.user._id)) {
     return next(new ApiError('Not authorized to update this RSVP', 403));
   }
 
@@ -205,7 +205,7 @@ exports.cancelRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('RSVP not found', 404));
   }
 
-  if (rsvp.attendee.toString() !== req.user._id.toString()) {
+  if (String(rsvp.attendee) !== String(req.user._id)) {
     return next(new ApiError('Not authorized', 403));
   }
 
@@ -334,7 +334,7 @@ exports.rateEvent = catchAsync(async (req, res, next) => {
     return next(new ApiError('RSVP not found', 404));
   }
 
-  if (rsvp.attendee.toString() !== req.user._id.toString()) {
+  if (String(rsvp.attendee) !== String(req.user._id)) {
     return next(new ApiError('Not authorized', 403));
   }
 
@@ -445,6 +445,8 @@ const guestView = (rsvp) => ({
   guestName: rsvp.guestName,
   status: rsvp.status,
   guestsCount: rsvp.guestsCount,
+  paymentStatus: rsvp.paymentStatus,
+  amountPaid: rsvp.amountPaid,
   checkInCode: rsvp.status === 'going' ? rsvp.checkInCode : undefined
 });
 
@@ -480,18 +482,29 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
   if (['cancelled', 'completed'].includes(event.status) || new Date(event.date) < startOfToday()) {
     return next(new ApiError('This event is no longer accepting RSVPs', 400));
   }
-  if (event.entryFee > 0) {
-    return next(new ApiError('This event needs a ticket. Please sign in to buy one.', 400));
-  }
+  // Tickets are bought without an account too; the phone number is how the
+  // host and Festivo reach the buyer about refunds
+  const needsTicket = event.entryFee > 0 && status === 'going';
 
   // The same guest changing their answer: by their private token, else by phone
   let rsvp = null;
   if (typeof guestToken === 'string' && guestToken) {
-    rsvp = await RSVP.findOne({ event: eventId, guestTokenHash: hashToken(guestToken) });
+    rsvp = await RSVP.findOne({ event: eventId, guestTokenHash: hashToken(guestToken) }).select('+guestPhone');
+  }
+  // A guest finishing an unpaid ticket already gave their number
+  if (needsTicket && !phone && !(rsvp && rsvp.guestPhone)) {
+    return next(new ApiError('Please enter your mobile number to buy a ticket', 400));
   }
   const foundByToken = !!rsvp;
   if (!rsvp && phone) {
     rsvp = await RSVP.findOne({ event: eventId, guestPhone: phone, attendee: { $exists: false } });
+  }
+
+  // A bought ticket covers a fixed number of people; cancel it to change
+  if (rsvp && rsvp.paymentStatus === 'paid' && rsvp.status === 'going') {
+    return next(new ApiError(needsTicket && guestsCount === rsvp.guestsCount
+      ? 'You already have a ticket for this event'
+      : 'You have a ticket for this event. Cancel it first to change your answer.', 400));
   }
 
   if (status === 'going' && event.maxAttendees) {
@@ -504,10 +517,11 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
   // A fresh token each time the guest is identified by phone, so only the
   // latest device can change the answer
   const token = foundByToken ? guestToken : crypto.randomBytes(24).toString('base64url');
+  const savedStatus = needsTicket ? 'pending_payment' : status;
   const isNew = !rsvp;
   if (rsvp) {
     rsvp.guestName = name;
-    rsvp.status = status;
+    rsvp.status = savedStatus;
     rsvp.guestsCount = guestsCount;
     if (phone) rsvp.guestPhone = phone;
     rsvp.guestTokenHash = hashToken(token);
@@ -518,9 +532,17 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
       guestName: name,
       guestPhone: phone || undefined,
       guestTokenHash: hashToken(token),
-      status,
+      status: savedStatus,
       guestsCount
     });
+  }
+
+  if (needsTicket) {
+    const checkout = await checkoutService.createTicketOrder(rsvp, event);
+    return res.status(isNew ? 201 : 200).json(ApiResponse.success(
+      { rsvp: guestView(rsvp), guestToken: token, checkout },
+      'Complete payment to confirm your ticket'
+    ));
   }
 
   if (isNew && status === 'going') {
@@ -546,4 +568,29 @@ exports.getGuestRSVP = catchAsync(async (req, res, next) => {
   const rsvp = await RSVP.findOne({ guestTokenHash: hashToken(token) });
   if (!rsvp) return next(new ApiError('RSVP not found', 404));
   res.json(ApiResponse.success(guestView(rsvp), 'RSVP retrieved'));
+});
+
+// @desc    A guest cancels their own RSVP or ticket, from their private token
+// @route   POST /api/v1/rsvps/guest/cancel
+// @access  Public (rate limited)
+exports.cancelGuestRSVP = catchAsync(async (req, res, next) => {
+  const { token } = req.body;
+  if (typeof token !== 'string' || token.length < 20) return next(new ApiError('RSVP not found', 404));
+  const rsvp = await RSVP.findOne({ guestTokenHash: hashToken(token) });
+  if (!rsvp) return next(new ApiError('RSVP not found', 404));
+  if (rsvp.status === 'cancelled') return next(new ApiError('This RSVP is already cancelled', 400));
+
+  let refunded = 0;
+  if (rsvp.paymentStatus === 'paid') {
+    const event = await Event.findById(rsvp.event);
+    refunded = await checkoutService.refundTicket(rsvp, policies.ticketRefundShare(event), 'Guest cancelled');
+  }
+
+  rsvp.status = 'cancelled';
+  await rsvp.save();
+
+  res.json(ApiResponse.success(
+    { rsvp: guestView(rsvp), refundIssued: refunded },
+    refunded > 0 ? `Cancelled. ₹${refunded} will be refunded to how you paid.` : 'Your RSVP is cancelled'
+  ));
 });

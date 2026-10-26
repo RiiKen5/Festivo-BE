@@ -17,6 +17,8 @@ cd backend/e2e && npm test           # terminal 3: seeds and runs every journey
 | `journey-booking.js` | book a vendor, quote, advance + balance payment, chat, complete, review, vendor reply, payout details, admin payout + verification |
 | `journey-events.js` | create private event, checklist, publish, invite link RSVP, paid ticket, check-in by code, cancel event with refunds |
 | `journey-account.js` | sign up, verify email, vendor listing with photo uploads, profile + avatar, change password, forgot/reset password, search and filters |
+| `journey-guest-rsvp.js` | RSVP and buy a ticket without an account on a phone, change and cancel, host sees the guest, fee passed on to guests |
+| `journey-dispute.js` | arrival code on the day, wrong code refused, reported no-show freezes the payout, vendor replies with a photo, admin settles with a partial refund, no-show shown on the listing |
 | `journey-secondary.js` | vendor cancels a paid booking, pause/edit listing, edit/unpublish event, cancel ticket refund, notifications, legal pages |
 
 `crawl.js` visits every page as each role; `mobile.js` checks for horizontal

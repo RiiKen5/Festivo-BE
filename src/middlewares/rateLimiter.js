@@ -66,7 +66,8 @@ const uploadLimiter = rateLimit({
 // Create booking limiter
 const bookingLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10, // limit each IP to 10 bookings per hour
+  // Limit each IP to 10 bookings per hour (raised for automated local runs)
+  max: parseInt(process.env.BOOKING_RATE_LIMIT, 10) || 10,
   message: {
     success: false,
     error: {

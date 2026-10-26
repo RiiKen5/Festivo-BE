@@ -8,6 +8,7 @@ const ApiResponse = require('../utils/apiResponse');
 const paymentService = require('../services/paymentService');
 const checkoutService = require('../services/checkoutService');
 const policies = require('../config/policies');
+const { hashToken } = require('../utils/helpers');
 
 // @desc    Public payment settings for the checkout UI
 // @route   GET /api/v1/payments/config
@@ -49,7 +50,7 @@ exports.createBookingOrder = catchAsync(async (req, res, next) => {
 exports.createTicketOrder = catchAsync(async (req, res, next) => {
   const rsvp = await RSVP.findById(req.params.id);
 
-  if (!rsvp || rsvp.attendee.toString() !== req.user._id.toString()) {
+  if (!rsvp || String(rsvp.attendee) !== String(req.user._id)) {
     return next(new ApiError('RSVP not found', 404));
   }
 
@@ -85,12 +86,38 @@ exports.verifyPayment = catchAsync(async (req, res, next) => {
   }
 
   const existing = await Payment.findOne({ razorpayOrderId: orderId });
-  if (!existing || existing.payer.toString() !== req.user._id.toString()) {
+  if (!existing || !existing.payer || existing.payer.toString() !== req.user._id.toString()) {
     return next(new ApiError('Payment order not found', 404));
   }
 
   const payment = await checkoutService.capturePayment({ orderId, paymentId });
   res.json(ApiResponse.success(payment, 'Payment successful'));
+});
+
+// @desc    Confirm a ticket payment made without an account
+// @route   POST /api/v1/payments/guest/verify
+// @access  Public (the guest's private RSVP token proves ownership)
+exports.verifyGuestPayment = catchAsync(async (req, res, next) => {
+  const {
+    razorpay_order_id: orderId,
+    razorpay_payment_id: paymentId,
+    razorpay_signature: signature,
+    guestToken
+  } = req.body;
+
+  if (!paymentService.verifyPaymentSignature(orderId, paymentId, signature)) {
+    return next(new ApiError('Payment verification failed', 400));
+  }
+
+  const existing = await Payment.findOne({ razorpayOrderId: orderId, kind: 'ticket' });
+  const rsvp = existing && typeof guestToken === 'string' &&
+    await RSVP.findOne({ _id: existing.rsvp, guestTokenHash: hashToken(guestToken) });
+  if (!rsvp) {
+    return next(new ApiError('Payment order not found', 404));
+  }
+
+  await checkoutService.capturePayment({ orderId, paymentId });
+  res.json(ApiResponse.success({ status: 'paid' }, 'Payment successful'));
 });
 
 // @desc    Razorpay webhook (backup for when the browser never calls verify)

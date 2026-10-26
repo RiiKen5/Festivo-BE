@@ -8,6 +8,7 @@ const { validate, rsvpValidations, paramValidations, paginationValidations } = r
 // RSVP without an account, from the invite link (free events only)
 router.post('/guest', guestRsvpLimiter, rsvpController.createGuestRSVP);
 router.get('/guest', guestRsvpLimiter, rsvpController.getGuestRSVP);
+router.post('/guest/cancel', guestRsvpLimiter, rsvpController.cancelGuestRSVP);
 
 // Everything else needs a signed-in user
 router.use(protect);

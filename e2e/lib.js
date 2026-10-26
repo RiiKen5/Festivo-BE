@@ -68,4 +68,4 @@ async function tokenFor(email) {
   return r.data.tokens.accessToken;
 }
 
-module.exports = { chromium, APP, API, session, login, settle, api, tokenFor, pickCity };
+module.exports = { chromium, APP, API, session, login, settle, api, tokenFor, pickCity, FAKE_CHECKOUT };

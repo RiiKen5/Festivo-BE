@@ -67,7 +67,13 @@ exports.createBookingOrder = async (booking, amount) => {
 exports.createTicketOrder = async (rsvp, event) => {
   ensureConfigured();
 
-  const amount = round2(event.entryFee * (1 + (rsvp.guestsCount || 0)));
+  const people = 1 + (rsvp.guestsCount || 0);
+  const amount = round2(policies.ticketPrice(event) * people);
+  // When the guest pays the fee on top, the host still gets the full entry fee
+  const hostShare = round2(event.entryFee * people);
+  const feePercent = event.ticketFeePaidBy === 'guest'
+    ? ((amount - hostShare) / amount) * 100
+    : policies.ticketFeePercent();
   const order = await paymentService.createOrder(amount, `ticket_${rsvp._id}`, {
     kind: 'ticket',
     rsvp_id: rsvp._id.toString()
@@ -80,7 +86,7 @@ exports.createTicketOrder = async (rsvp, event) => {
     payer: rsvp.attendee,
     payee: event.organizer,
     amount,
-    feePercent: policies.ticketFeePercent(),
+    feePercent,
     razorpayOrderId: order.id
   });
 
@@ -181,7 +187,7 @@ const applyTicketPayment = async (payment) => {
     recipient: rsvp.event.organizer,
     type: 'rsvp',
     title: 'Ticket Sold',
-    message: `A ticket for "${rsvp.event.title}" was purchased (₹${payment.amount})`,
+    message: `${rsvp.guestName ? `${rsvp.guestName} bought a` : 'A'} ticket for "${rsvp.event.title}" (₹${payment.amount})`,
     relatedEvent: rsvp.event._id,
     relatedUser: rsvp.attendee,
     actionUrl: `/events/${rsvp.event._id}`

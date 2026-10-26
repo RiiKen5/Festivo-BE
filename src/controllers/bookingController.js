@@ -9,6 +9,7 @@ const checkoutService = require('../services/checkoutService');
 const bookingService = require('../services/bookingService');
 const chatService = require('../services/chatService');
 const availability = require('../services/availabilityService');
+const disputeService = require('../services/disputeService');
 
 const prettyDay = (date) => new Date(date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 const UNAVAILABLE = {
@@ -106,7 +107,19 @@ exports.getBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError('Not authorized to view this booking', 403));
   }
 
-  res.json(ApiResponse.success(booking, 'Booking retrieved successfully'));
+  // Only the organizer sees the arrival code; they read it to the vendor
+  const data = booking.toJSON();
+  if (booking.organizer._id.toString() === req.user._id.toString() && ['confirmed', 'in_progress'].includes(booking.status)) {
+    const withCode = await Booking.findById(booking._id).select('+arrivalCode');
+    if (!withCode.arrivalCode) {
+      // Bookings accepted before arrival codes existed
+      withCode.arrivalCode = String(require('crypto').randomInt(0, 10000)).padStart(4, '0');
+      await Booking.updateOne({ _id: booking._id }, { arrivalCode: withCode.arrivalCode });
+    }
+    data.arrivalCode = withCode.arrivalCode;
+  }
+
+  res.json(ApiResponse.success(data, 'Booking retrieved successfully'));
 });
 
 // @desc    Create booking
@@ -316,6 +329,10 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
     return next(new ApiError(`Cannot cancel a ${booking.status} booking`, 400));
   }
 
+  if (booking.dispute && booking.dispute.status === 'open') {
+    return next(new ApiError('A reported problem is being reviewed. Festivo will settle it.', 400));
+  }
+
   const refunded = await bookingService.cancelBooking(booking, req.user, reason);
 
   res.json(ApiResponse.success(
@@ -341,6 +358,10 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
 
   if (booking.status !== 'confirmed' && booking.status !== 'in_progress') {
     return next(new ApiError('Booking must be confirmed or in progress to complete', 400));
+  }
+
+  if (booking.dispute && booking.dispute.status === 'open') {
+    return next(new ApiError('A reported problem is being reviewed. Festivo will settle it.', 400));
   }
 
   booking.status = 'completed';
@@ -494,4 +515,64 @@ exports.getBookingStats = catchAsync(async (req, res, next) => {
   });
 
   res.json(ApiResponse.success(formattedStats, 'Booking stats retrieved'));
+});
+
+const loadOwnBooking = async (req, next, side, select = '') => {
+  const booking = await Booking.findById(req.params.id).select(select);
+  if (!booking) {
+    next(new ApiError('Booking not found', 404));
+    return null;
+  }
+  if (booking[side].toString() !== req.user._id.toString()) {
+    next(new ApiError('Not authorized', 403));
+    return null;
+  }
+  return booking;
+};
+
+// @desc    Vendor confirms arrival with the organizer's 4-digit code
+// @route   POST /api/v1/bookings/:id/arrive
+// @access  Private (vendor)
+exports.confirmArrival = catchAsync(async (req, res, next) => {
+  const booking = await loadOwnBooking(req, next, 'vendor', '+arrivalCode +arrivalAttempts');
+  if (!booking) return;
+  await disputeService.confirmArrival(booking, req.user, req.body.code);
+  const { arrivalCode, arrivalAttempts, ...data } = booking.toJSON();
+  res.json(ApiResponse.success(data, 'Arrival confirmed'));
+});
+
+// @desc    Organizer marks the vendor as arrived (no code needed)
+// @route   POST /api/v1/bookings/:id/mark-arrived
+// @access  Private (organizer)
+exports.markArrived = catchAsync(async (req, res, next) => {
+  const booking = await loadOwnBooking(req, next, 'organizer');
+  if (!booking) return;
+  if (!['confirmed', 'in_progress'].includes(booking.status) || booking.arrivedAt) {
+    return next(new ApiError('This booking cannot be marked as arrived', 400));
+  }
+  booking.arrivedAt = new Date();
+  booking.status = 'in_progress';
+  await booking.save();
+  await chatService.postBookingUpdate(booking, req.user._id, 'Marked the vendor as arrived');
+  res.json(ApiResponse.success(booking, 'Vendor marked as arrived'));
+});
+
+// @desc    Organizer reports a problem (no-show or not as agreed); freezes the payout
+// @route   POST /api/v1/bookings/:id/report-problem
+// @access  Private (organizer)
+exports.reportProblem = catchAsync(async (req, res, next) => {
+  const booking = await loadOwnBooking(req, next, 'organizer');
+  if (!booking) return;
+  await disputeService.reportProblem(booking, req.user, req.body);
+  res.json(ApiResponse.success(booking, 'Problem reported. The vendor has been asked to reply.'));
+});
+
+// @desc    Vendor replies to a reported problem with their side and photos
+// @route   POST /api/v1/bookings/:id/dispute-response
+// @access  Private (vendor)
+exports.respondToDispute = catchAsync(async (req, res, next) => {
+  const booking = await loadOwnBooking(req, next, 'vendor');
+  if (!booking) return;
+  await disputeService.respond(booking, req.user, req.body);
+  res.json(ApiResponse.success(booking, 'Reply sent. Festivo will review both sides.'));
 });

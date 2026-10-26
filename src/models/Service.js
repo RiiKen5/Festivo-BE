@@ -117,6 +117,11 @@ const serviceSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  // Verified no-shows by this service's vendor; shown publicly and ranks it lower
+  noShowCount: {
+    type: Number,
+    default: 0
+  },
 
   // Verification
   isVerified: {

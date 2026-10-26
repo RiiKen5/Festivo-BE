@@ -1,6 +1,7 @@
 // RSVP without an account: a guest opens a private invite link on their phone,
 // RSVPs with a name, gets a check-in code, changes their answer; the host sees them.
-const { chromium, APP, session, login, settle, api, tokenFor } = require('./lib');
+// A guest also buys a paid ticket with just a name and phone, then cancels it.
+const { chromium, APP, session, login, settle, api, tokenFor, FAKE_CHECKOUT } = require('./lib');
 const BE = require('path').resolve(__dirname, '..');
 const mongoose = require(BE + '/node_modules/mongoose');
 const Event = require(BE + '/src/models/Event');
@@ -18,6 +19,7 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
 
   // A guest on a phone, not signed in, opens the WhatsApp invite link
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await ctx.route('https://checkout.razorpay.com/**', r => r.fulfill({ contentType: 'application/javascript', body: FAKE_CHECKOUT }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -43,11 +45,33 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
   await modal.getByRole('button', { name: 'Update RSVP' }).click();
   check(await until(() => page.locator('.rsvp-status-card').first().innerText().then(t => t.includes('Maybe, Asha Rao'))), 'guest changes to maybe');
 
-  // Paid events still need sign-in to buy a ticket
-  if (paid) {
-    await page.goto(`${APP}/events/${paid.slug}`); await settle(page);
-    check(await page.getByRole('button', { name: 'Log in to buy', exact: true }).isVisible(), 'paid event asks to log in to buy');
-  }
+  // Paid events: buy a ticket with a name and phone, no account
+  await page.goto(`${APP}/events/${paid.slug}`); await settle(page);
+  await page.getByRole('button', { name: 'Buy ticket', exact: true }).click();
+  check(await modal.getByText('for your ticket and any refund').isVisible(), 'phone asked for the ticket');
+  await page.locator('#guest-name').fill('Kiran Shah');
+  check(await modal.getByRole('button', { name: 'Continue to Payment' }).isDisabled(), 'phone is required to buy');
+  await page.locator('#guest-phone').fill('98765 43210');
+  await modal.getByRole('button', { name: 'Continue to Payment' }).click();
+  check(await until(() => page.locator('.rsvp-status-card').first().innerText().then(t => t.includes('You have a ticket, Kiran Shah'))), 'guest bought a ticket without an account');
+  check(await page.locator('.code-value').first().isVisible(), 'ticket check-in code shown');
+  const paidAmount = await page.evaluate(() => window.__lastCheckout && window.__lastCheckout.amount);
+  check(paidAmount === paid.entryFee * 100, `charged the ticket price (${paidAmount / 100})`);
+  await page.screenshot({ path: 'shots/guest-ticket-phone.png', fullPage: false });
+
+  await page.reload(); await settle(page);
+  check(await until(() => page.locator('.rsvp-status-card').first().innerText().then(t => t.includes('You have a ticket'))), 'ticket remembered on return');
+  page.once('dialog', d => d.accept());
+  await page.getByRole('button', { name: 'Cancel ticket' }).click();
+  check(await until(() => page.getByRole('button', { name: 'Buy ticket, no sign-up needed' }).isVisible()), 'guest cancels the ticket (refund per policy)');
+
+  // When the host passes the fee on, guests see and pay it on top
+  await Event.updateOne({ _id: paid._id }, { ticketFeePaidBy: 'guest' });
+  await page.reload(); await settle(page);
+  await page.getByRole('button', { name: 'Buy ticket', exact: true }).click();
+  check(await modal.getByText("Includes Festivo's 5% booking fee").isVisible(), 'fee on top is explained');
+  check(await modal.locator('.total-value').innerText().then(t => t.includes(String(Math.round(paid.entryFee * 1.05 * 100) / 100))), 'total includes the fee');
+  await modal.getByRole('button', { name: 'Cancel' }).click();
   check(errors.length === 0, `no page errors ${errors.join(' | ')}`);
   await ctx.close();
 

@@ -28,6 +28,10 @@ router.put('/:id', paramValidations.mongoId, validate, bookingController.updateB
 router.post('/:id/confirm', paramValidations.mongoId, validate, bookingController.confirmBooking);
 router.post('/:id/cancel', paramValidations.mongoId, validate, bookingController.cancelBooking);
 router.post('/:id/complete', paramValidations.mongoId, validate, bookingController.completeBooking);
+router.post('/:id/arrive', paramValidations.mongoId, validate, bookingController.confirmArrival);
+router.post('/:id/mark-arrived', paramValidations.mongoId, validate, bookingController.markArrived);
+router.post('/:id/report-problem', paramValidations.mongoId, validate, bookingController.reportProblem);
+router.post('/:id/dispute-response', paramValidations.mongoId, validate, bookingController.respondToDispute);
 // Vendor records an offline (cash/UPI) payment they received.
 // Organizers pay through /payments/bookings/:id/order.
 router.put('/:id/payment', paramValidations.mongoId, validate, bookingController.recordPayment);

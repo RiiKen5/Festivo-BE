@@ -177,6 +177,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Vendor accountability: verified no-shows, and penalties to deduct from
+  // their next payout
+  noShowCount: {
+    type: Number,
+    default: 0
+  },
+  penaltyDue: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   role: {
     type: String,
     enum: ['user', 'admin'],

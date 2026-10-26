@@ -5,7 +5,7 @@
   "scripts": {
     "stack": "node devstack.js",
     "seed": "node seed.js",
-    "test": "for j in journey-booking journey-events journey-account journey-secondary journey-growth journey-chat journey-planner journey-voice journey-card journey-availability journey-guest-rsvp; do node seed.js && node $j.js || exit 1; done",
+    "test": "for j in journey-booking journey-events journey-account journey-secondary journey-growth journey-chat journey-planner journey-voice journey-card journey-availability journey-guest-rsvp journey-dispute; do node seed.js && node $j.js || exit 1; done",
     "a11y": "node seed.js && node a11y.js",
     "crawl": "node seed.js && node crawl.js",
     "mobile": "node seed.js && node mobile.js"

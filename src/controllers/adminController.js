@@ -10,6 +10,8 @@ const catchAsync = require('../utils/catchAsync');
 const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 
+const disputeService = require('../services/disputeService');
+
 const round2 = (n) => Math.round((n || 0) * 100) / 100;
 
 // @desc    Marketplace health and revenue
@@ -19,7 +21,7 @@ exports.getStats = catchAsync(async (req, res, next) => {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const collected = { status: { $in: ['paid', 'partially_refunded', 'refunded'] } };
 
-  const [users, newUsers, vendors, events, bookingsByStatus, money, money30d, payouts, pendingVerification, flaggedReviews] =
+  const [users, newUsers, vendors, events, bookingsByStatus, money, money30d, payouts, pendingVerification, flaggedReviews, openDisputes] =
     await Promise.all([
       User.countDocuments(),
       User.countDocuments({ createdAt: { $gte: since } }),
@@ -33,7 +35,8 @@ exports.getStats = catchAsync(async (req, res, next) => {
         { $group: { _id: null, amount: { $sum: '$payeeAmount' }, count: { $sum: 1 } } }
       ]),
       Service.countDocuments({ isVerified: false, isActive: true }),
-      Review.countDocuments({ $or: [{ isFlagged: true }, { 'reports.0': { $exists: true } }], isApproved: true })
+      Review.countDocuments({ $or: [{ isFlagged: true }, { 'reports.0': { $exists: true } }], isApproved: true }),
+      Booking.countDocuments({ 'dispute.status': 'open' })
     ]);
 
   res.json(ApiResponse.success({
@@ -44,7 +47,8 @@ exports.getStats = catchAsync(async (req, res, next) => {
     money: { allTime: money, last30Days: money30d },
     payoutsDue: { amount: round2(payouts[0] && payouts[0].amount), count: (payouts[0] && payouts[0].count) || 0 },
     pendingVerification,
-    flaggedReviews
+    flaggedReviews,
+    openDisputes
   }, 'Admin stats retrieved'));
 });
 
@@ -77,7 +81,7 @@ exports.getPayouts = catchAsync(async (req, res, next) => {
 
   const [payments, total] = await Promise.all([
     Payment.find(query)
-      .populate('payee', 'name email phone +payoutDetails')
+      .populate('payee', 'name email phone penaltyDue noShowCount +payoutDetails')
       .populate('event', 'title date')
       .sort('createdAt')
       .limit(limit * 1)
@@ -98,21 +102,36 @@ exports.markPayoutPaid = catchAsync(async (req, res, next) => {
     return next(new ApiError('Transfer reference (UTR) is required', 400));
   }
 
+  // A no-show penalty owed by the payee is taken out of this payout
+  const pending = await Payment.findOne({ _id: req.params.id, payoutStatus: 'pending' });
+  if (!pending) {
+    return next(new ApiError('No pending payout found', 404));
+  }
+  const payee = await User.findById(pending.payee).select('penaltyDue');
+  const deducted = round2(Math.min(payee ? payee.penaltyDue : 0, pending.payeeAmount));
+
   const payment = await Payment.findOneAndUpdate(
     { _id: req.params.id, payoutStatus: 'pending' },
-    { payoutStatus: 'paid', payoutReference: reference, paidOutAt: new Date(), paidOutBy: req.user._id },
+    {
+      payoutStatus: 'paid', payoutReference: reference, paidOutAt: new Date(), paidOutBy: req.user._id,
+      penaltyDeducted: deducted
+    },
     { new: true }
   );
 
   if (!payment) {
     return next(new ApiError('No pending payout found', 404));
   }
+  if (deducted > 0) {
+    await User.updateOne({ _id: payment.payee }, { $inc: { penaltyDue: -deducted } });
+  }
 
+  const sent = round2(payment.payeeAmount - deducted);
   await Notification.createNotification({
     recipient: payment.payee,
     type: 'payment',
     title: 'Payout Sent',
-    message: `₹${payment.payeeAmount} has been sent to your account (ref ${reference})`,
+    message: `₹${sent} has been sent to your account (ref ${reference})${deducted ? `, after a ₹${deducted} no-show penalty` : ''}`,
     relatedBooking: payment.booking,
     relatedEvent: payment.event,
     actionUrl: '/dashboard'
@@ -218,4 +237,39 @@ exports.getGrowth = catchAsync(async (req, res, next) => {
     },
     supply: { activeVendors, vendorsWithAcceptedBooking: confirmedVendors }
   }, 'Growth metrics retrieved'));
+});
+
+// @desc    Reported problems on bookings (open first)
+// @route   GET /api/v1/admin/disputes?status=open|resolved
+// @access  Admin
+exports.getDisputes = catchAsync(async (req, res, next) => {
+  const status = req.query.status === 'resolved' ? 'resolved' : 'open';
+  const bookings = await Booking.find({ 'dispute.status': status })
+    .populate('organizer', 'name email phone')
+    .populate('vendor', 'name email phone noShowCount')
+    .populate('service', 'serviceName category')
+    .populate('event', 'title date city')
+    .sort(status === 'open' ? 'dispute.respondBy' : '-dispute.resolvedAt')
+    .limit(100)
+    .lean();
+
+  const withMoney = await Promise.all(bookings.map(async (b) => ({
+    ...b,
+    refundableOnline: await disputeService.refundableOnline(b._id)
+  })));
+
+  res.json(ApiResponse.success(withMoney, 'Disputes retrieved'));
+});
+
+// @desc    Settle a reported problem: refund, partial refund or release
+// @route   POST /api/v1/admin/disputes/:id/resolve
+// @access  Admin
+exports.resolveDispute = catchAsync(async (req, res, next) => {
+  const booking = await Booking.findById(req.params.id);
+  if (!booking) {
+    return next(new ApiError('Booking not found', 404));
+  }
+  const { resolution, amount, noShow, penalty, note } = req.body;
+  const result = await disputeService.resolve(booking, req.user, { resolution, amount, noShow, penalty, note });
+  res.json(ApiResponse.success(result, 'Dispute resolved'));
 });

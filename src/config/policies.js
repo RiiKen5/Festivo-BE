@@ -16,6 +16,21 @@ module.exports = {
   ticketFeePercent: () => percentFromEnv('TICKET_FEE_PERCENT', 5),
 
   /**
+   * What one ticket costs the buyer. The organizer chooses who pays the
+   * platform fee: taken from their ticket price, or added on top of it.
+   * @param {object} event - Event with entryFee and ticketFeePaidBy
+   * @returns {number} - Rupees per person
+   */
+  ticketPrice: (event) => {
+    const fee = event.ticketFeePaidBy === 'guest' ? module.exports.ticketFeePercent() : 0;
+    return Math.round(event.entryFee * (100 + fee)) / 100;
+  },
+
+  // Hours a vendor has to answer a reported problem before the organizer
+  // is refunded automatically (unless the vendor's arrival was verified)
+  disputeResponseHours: () => 24,
+
+  /**
    * Share of a booking's online payments refunded to the organizer when the
    * booking is cancelled.
    * @param {object} booking - Booking being cancelled

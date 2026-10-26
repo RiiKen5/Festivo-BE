@@ -130,6 +130,13 @@ const eventSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Who pays Festivo's ticket fee: taken from the host's price, or added
+  // on top for the guest
+  ticketFeePaidBy: {
+    type: String,
+    enum: ['host', 'guest'],
+    default: 'host'
+  },
 
   // Media
   coverPhoto: String,

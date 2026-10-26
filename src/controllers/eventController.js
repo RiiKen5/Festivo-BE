@@ -28,7 +28,7 @@ const availability = require('../services/availabilityService');
 const UPDATABLE_EVENT_FIELDS = [
   'title', 'description', 'eventType', 'date', 'time', 'endDate', 'timezone',
   'locationName', 'address', 'city', 'expectedGuests', 'maxAttendees',
-  'budget', 'isPublic', 'entryFee', 'isPaid', 'coverPhoto', 'photos',
+  'budget', 'isPublic', 'entryFee', 'ticketFeePaidBy', 'isPaid', 'coverPhoto', 'photos',
   'tags', 'category', 'vibeScore', 'metaTitle', 'metaDescription'
 ];
 

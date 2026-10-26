@@ -129,6 +129,59 @@ const bookingSchema = new mongoose.Schema({
   },
   cancelledAt: Date,
 
+  // Arrival: the organizer reads this code to the vendor, who enters it
+  // when they arrive. Hidden from the vendor until then.
+  arrivalCode: {
+    type: String,
+    select: false
+  },
+  arrivedAt: Date,
+  arrivalAttempts: {
+    type: Number,
+    default: 0,
+    select: false
+  },
+
+  // A problem the organizer reported (vendor didn't come, or didn't deliver
+  // what was agreed). While open, the vendor's payout is frozen.
+  dispute: {
+    status: {
+      type: String,
+      enum: ['open', 'resolved']
+    },
+    reason: {
+      type: String,
+      enum: ['no_show', 'not_as_agreed', 'other']
+    },
+    details: {
+      type: String,
+      maxlength: [1000, 'Details cannot exceed 1000 characters']
+    },
+    openedAt: Date,
+    // The vendor must answer by this time
+    respondBy: Date,
+    vendorResponse: {
+      type: String,
+      maxlength: [1000, 'Response cannot exceed 1000 characters']
+    },
+    vendorEvidence: [String],
+    vendorRespondedAt: Date,
+    // refund: organizer refunded in full; partial: part refunded; release: vendor paid
+    resolution: {
+      type: String,
+      enum: ['refund', 'partial', 'release']
+    },
+    refunded: Number,
+    noShow: Boolean,
+    resolutionNote: String,
+    resolvedAt: Date,
+    // Empty when resolved automatically
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
+
   // Completion
   completedAt: Date
 }, {
@@ -146,6 +199,15 @@ bookingSchema.index({ status: 1 });
 bookingSchema.index({ eventDate: 1 });
 bookingSchema.index({ paymentStatus: 1 });
 bookingSchema.index({ createdAt: -1 });
+bookingSchema.index({ 'dispute.status': 1, 'dispute.respondBy': 1 });
+
+// Four-digit arrival code, created when the vendor accepts
+bookingSchema.pre('save', function(next) {
+  if (this.status === 'confirmed' && !this.arrivalCode && this.isModified('status')) {
+    this.arrivalCode = String(require('crypto').randomInt(0, 10000)).padStart(4, '0');
+  }
+  next();
+});
 
 // isNew/isModified are reset before post('save') runs, so record them here
 bookingSchema.pre('save', function(next) {

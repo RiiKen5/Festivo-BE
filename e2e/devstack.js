@@ -11,7 +11,8 @@ const { spawn } = require('child_process');
     FRONTEND_URL: 'http://localhost:4200', JWT_SECRET: 'devjwt', JWT_REFRESH_SECRET: 'devrefresh',
     ADMIN_SECRET: 'e2e-admin', RAZORPAY_KEY_ID: 'rzp_test_e2e', RAZORPAY_KEY_SECRET: 'e2e_secret',
     RAZORPAY_WEBHOOK_SECRET: 'e2e_webhook', SMTP_HOST: '', GOOGLE_CLIENT_ID: '',
-    API_RATE_LIMIT: '100000' // automated runs make many requests from one IP
+    // automated runs make many requests from one IP
+    API_RATE_LIMIT: '100000', BOOKING_RATE_LIMIT: '1000'
   };
   const srv = spawn('node', ['-r', path.join(__dirname, 'razorpay-mock.js'), 'server.js'], { env, cwd: BE, stdio: 'inherit' });
   console.log('[e2e] mongo at', uri);

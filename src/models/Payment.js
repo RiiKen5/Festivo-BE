@@ -23,10 +23,11 @@ const paymentSchema = new mongoose.Schema({
   },
 
   // Who paid, and who the money is ultimately for (vendor or event organizer)
+  // Empty for tickets bought without an account
   payer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: [function() { return this.kind === 'booking'; }, 'Payer is required']
   },
   payee: {
     type: mongoose.Schema.Types.ObjectId,
@@ -94,6 +95,11 @@ const paymentSchema = new mongoose.Schema({
     default: 'not_due'
   },
   payoutReference: String,
+  // No-show penalty owed by the payee, taken out of this payout
+  penaltyDeducted: {
+    type: Number,
+    default: 0
+  },
   paidOutAt: Date,
   paidOutBy: {
     type: mongoose.Schema.Types.ObjectId,

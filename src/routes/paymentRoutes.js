@@ -3,10 +3,12 @@ const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const { protect } = require('../middlewares/auth');
 const { paramValidations, validate } = require('../middlewares/validation');
+const { guestRsvpLimiter } = require('../middlewares/rateLimiter');
 
 // The webhook is mounted separately in app.js because it needs the raw body
 
 router.get('/config', paymentController.getConfig);
+router.post('/guest/verify', guestRsvpLimiter, paymentController.verifyGuestPayment);
 
 router.use(protect);
 
