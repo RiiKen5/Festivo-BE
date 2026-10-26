@@ -342,7 +342,8 @@ exports.cancelEvent = catchAsync(async (req, res, next) => {
       rsvp.status = 'cancelled';
       await rsvp.save();
 
-      await Notification.createNotification({
+      // Guests who RSVPed without an account have no inbox to notify
+      if (rsvp.attendee) await Notification.createNotification({
         recipient: rsvp.attendee,
         type: 'event_reminder',
         title: 'Event Cancelled',

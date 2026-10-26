@@ -35,7 +35,9 @@ exports.getEventRSVPs = catchAsync(async (req, res, next) => {
   const query = { event: req.params.eventId };
   if (status) query.status = status;
 
+  // Organizers also see the contact number of guests who RSVPed without an account
   const rsvps = await RSVP.find(query)
+    .select('+guestPhone')
     .populate('attendee', 'name profilePhoto email phone')
     .sort('-createdAt')
     .limit(limit * 1)
@@ -431,4 +433,117 @@ exports.getRSVPStats = catchAsync(async (req, res, next) => {
       'RSVP stats retrieved'
     )
   );
+});
+
+const crypto = require('crypto');
+const { hashToken } = require('../utils/helpers');
+
+// What a guest without an account is shown about their own RSVP
+const guestView = (rsvp) => ({
+  _id: rsvp._id,
+  event: rsvp.event,
+  guestName: rsvp.guestName,
+  status: rsvp.status,
+  guestsCount: rsvp.guestsCount,
+  checkInCode: rsvp.status === 'going' ? rsvp.checkInCode : undefined
+});
+
+// Indian mobile numbers, with or without +91 / spaces
+const normalisePhone = (value) => {
+  if (value === undefined || value === null || value === '') return null;
+  const digits = String(value).replace(/\D/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+  return /^[6-9]\d{9}$/.test(digits) ? digits : undefined;
+};
+
+// @desc    RSVP without an account (free events, from the invite link)
+// @route   POST /api/v1/rsvps/guest
+// @access  Public (rate limited)
+exports.createGuestRSVP = catchAsync(async (req, res, next) => {
+  const { eventId, inviteCode, guestToken } = req.body;
+  const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+  const status = req.body.status || 'going';
+  const guestsCount = Number(req.body.guestsCount || 0);
+  const phone = normalisePhone(req.body.phone);
+
+  if (name.length < 2 || name.length > 80) return next(new ApiError('Please enter your name', 400));
+  if (!['going', 'maybe', 'not_going'].includes(status)) return next(new ApiError('Invalid response', 400));
+  if (!Number.isInteger(guestsCount) || guestsCount < 0 || guestsCount > 10) {
+    return next(new ApiError('You can bring up to 10 people', 400));
+  }
+  if (phone === undefined) return next(new ApiError('Please enter a valid 10-digit mobile number, or leave it empty', 400));
+  if (!require('mongoose').isValidObjectId(eventId)) return next(new ApiError('Event not found', 404));
+
+  const event = await Event.findById(eventId).select('+inviteCode');
+  if (!event || !(await canAccessEvent(event, null, inviteCode))) {
+    return next(new ApiError('Event not found', 404));
+  }
+  if (['cancelled', 'completed'].includes(event.status) || new Date(event.date) < startOfToday()) {
+    return next(new ApiError('This event is no longer accepting RSVPs', 400));
+  }
+  if (event.entryFee > 0) {
+    return next(new ApiError('This event needs a ticket. Please sign in to buy one.', 400));
+  }
+
+  // The same guest changing their answer: by their private token, else by phone
+  let rsvp = null;
+  if (typeof guestToken === 'string' && guestToken) {
+    rsvp = await RSVP.findOne({ event: eventId, guestTokenHash: hashToken(guestToken) });
+  }
+  const foundByToken = !!rsvp;
+  if (!rsvp && phone) {
+    rsvp = await RSVP.findOne({ event: eventId, guestPhone: phone, attendee: { $exists: false } });
+  }
+
+  if (status === 'going' && event.maxAttendees) {
+    const alreadyHeld = rsvp && rsvp.status === 'going' ? 1 + (rsvp.guestsCount || 0) : 0;
+    if (event.currentAttendees - alreadyHeld + 1 + guestsCount > event.maxAttendees) {
+      return next(new ApiError('Event is at full capacity', 400));
+    }
+  }
+
+  // A fresh token each time the guest is identified by phone, so only the
+  // latest device can change the answer
+  const token = foundByToken ? guestToken : crypto.randomBytes(24).toString('base64url');
+  const isNew = !rsvp;
+  if (rsvp) {
+    rsvp.guestName = name;
+    rsvp.status = status;
+    rsvp.guestsCount = guestsCount;
+    if (phone) rsvp.guestPhone = phone;
+    rsvp.guestTokenHash = hashToken(token);
+    await rsvp.save();
+  } else {
+    rsvp = await RSVP.create({
+      event: eventId,
+      guestName: name,
+      guestPhone: phone || undefined,
+      guestTokenHash: hashToken(token),
+      status,
+      guestsCount
+    });
+  }
+
+  if (isNew && status === 'going') {
+    await Notification.createNotification({
+      recipient: event.organizer,
+      type: 'rsvp',
+      title: 'New RSVP',
+      message: `${name}${guestsCount ? ` (+${guestsCount})` : ''} is coming to "${event.title}"`,
+      relatedEvent: eventId,
+      actionUrl: `/events/${eventId}`
+    });
+  }
+
+  res.status(isNew ? 201 : 200).json(ApiResponse.success({ rsvp: guestView(rsvp), guestToken: token }, 'RSVP saved'));
+});
+
+// @desc    A guest's own RSVP, from their private token
+// @route   GET /api/v1/rsvps/guest?token=
+// @access  Public
+exports.getGuestRSVP = catchAsync(async (req, res, next) => {
+  const { token } = req.query;
+  if (typeof token !== 'string' || token.length < 20) return next(new ApiError('RSVP not found', 404));
+  const rsvp = await RSVP.findOne({ guestTokenHash: hashToken(token) });
+  if (!rsvp) return next(new ApiError('RSVP not found', 404));
+  res.json(ApiResponse.success(guestView(rsvp), 'RSVP retrieved'));
 });

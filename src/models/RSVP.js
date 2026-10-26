@@ -11,10 +11,27 @@ const rsvpSchema = new mongoose.Schema({
     ref: 'Event',
     required: true
   },
+  // Signed-in guest. Guests can also RSVP without an account (guestName).
   attendee: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: [function() { return !this.guestName; }, 'Attendee or guest name is required']
+  },
+
+  // RSVP without an account, from the invite link. Only the organizers see
+  // these details; the guest keeps a private token to change their answer.
+  guestName: {
+    type: String,
+    trim: true,
+    maxlength: [80, 'Name cannot exceed 80 characters']
+  },
+  guestPhone: {
+    type: String,
+    select: false
+  },
+  guestTokenHash: {
+    type: String,
+    select: false
   },
 
   // RSVP Status
@@ -69,8 +86,13 @@ const rsvpSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Compound index to prevent duplicate RSVPs
-rsvpSchema.index({ event: 1, attendee: 1 }, { unique: true });
+// One RSVP per signed-in user per event (guest RSVPs have no attendee)
+rsvpSchema.index(
+  { event: 1, attendee: 1 },
+  { unique: true, partialFilterExpression: { attendee: { $type: 'objectId' } } }
+);
+rsvpSchema.index({ event: 1, guestTokenHash: 1 });
+rsvpSchema.index({ event: 1, guestPhone: 1 });
 rsvpSchema.index({ event: 1, status: 1 });
 rsvpSchema.index({ createdAt: -1 });
 rsvpSchema.index({ event: 1, checkInCode: 1 });

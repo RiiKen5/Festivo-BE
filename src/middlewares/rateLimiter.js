@@ -93,8 +93,21 @@ const messageLimiter = rateLimit({
   legacyHeaders: false
 });
 
+// RSVPs without an account (public endpoint)
+const guestRsvpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: {
+    success: false,
+    error: { code: 'TOO_MANY_REQUESTS', message: 'Too many RSVPs from this device, please try again later' }
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
 module.exports = {
   clientKey,
+  guestRsvpLimiter,
   apiLimiter,
   authLimiter,
   uploadLimiter,

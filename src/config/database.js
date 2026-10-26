@@ -2,6 +2,23 @@ const mongoose = require('mongoose');
 
 let isConnected = false;
 
+// RSVPs without an account have no attendee, so the one-RSVP-per-user index
+// must only apply to signed-in RSVPs. Replace the old index if it's still there.
+const migrateRsvpIndex = async () => {
+  try {
+    const RSVP = require('../models/RSVP');
+    const indexes = await RSVP.collection.indexes();
+    const old = indexes.find(i => i.name === 'event_1_attendee_1' && !i.partialFilterExpression);
+    if (old) {
+      await RSVP.collection.dropIndex('event_1_attendee_1');
+      console.log('Replaced the RSVP (event, attendee) index to allow RSVPs without an account');
+    }
+    await RSVP.createIndexes();
+  } catch (error) {
+    console.error('RSVP index migration failed:', error.message);
+  }
+};
+
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
@@ -13,6 +30,7 @@ const connectDB = async () => {
 
     isConnected = true;
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+    await migrateRsvpIndex();
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
