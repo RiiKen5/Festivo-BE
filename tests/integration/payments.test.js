@@ -84,12 +84,12 @@ describe('booking payments', () => {
     expect(booking.pricePaid).toBe(12000);
 
     let payment = await Payment.findOne({ booking: bookingId });
-    expect(payment.platformFee).toBe(1800); // 15%
-    expect(payment.payeeAmount).toBe(10200);
+    expect(payment.platformFee).toBe(1000); // 10% of 12,000 capped at ₹1,000
+    expect(payment.payeeAmount).toBe(11000);
     expect(payment.payoutStatus).toBe('not_due');
 
     const earnings = await request(app).get('/api/v1/payments/mine?role=payee').set(auth(vendor.token));
-    expect(earnings.body.summary).toEqual({ held: 10200, payoutDue: 0, paidOut: 0 });
+    expect(earnings.body.summary).toEqual({ held: 11000, payoutDue: 0, paidOut: 0 });
 
     await request(app).post(`/api/v1/bookings/${bookingId}/complete`).set(auth(organizer.token)).expect(200);
     payment = await Payment.findById(payment._id);
@@ -221,8 +221,8 @@ describe('booking cancellation refunds', () => {
 
     const payment = await Payment.findOne({ booking: bookingId });
     expect(payment.status).toBe('partially_refunded');
-    expect(payment.platformFee).toBe(750);
-    expect(payment.payeeAmount).toBe(4250);
+    expect(payment.platformFee).toBe(500);
+    expect(payment.payeeAmount).toBe(4500);
     expect(payment.payoutStatus).toBe('pending');
   });
 
@@ -359,8 +359,8 @@ describe('admin', () => {
 
     const stats = await request(app).get('/api/v1/admin/stats').set(auth(admin.token));
     expect(stats.status).toBe(200);
-    expect(stats.body.data.money.allTime).toEqual({ collected: 10000, refunded: 0, platformRevenue: 1500 });
-    expect(stats.body.data.payoutsDue).toEqual({ amount: 8500, count: 1 });
+    expect(stats.body.data.money.allTime).toEqual({ collected: 10000, refunded: 0, platformRevenue: 1000 });
+    expect(stats.body.data.payoutsDue).toEqual({ amount: 9000, count: 1 });
 
     const payouts = await request(app).get('/api/v1/admin/payouts').set(auth(admin.token));
     expect(payouts.body.data).toHaveLength(1);
@@ -372,7 +372,7 @@ describe('admin', () => {
       .send({ reference: 'UTR123' }).expect(200);
 
     const earnings = await request(app).get('/api/v1/payments/mine?role=payee').set(auth(vendor.token));
-    expect(earnings.body.summary).toEqual({ held: 0, payoutDue: 0, paidOut: 8500 });
+    expect(earnings.body.summary).toEqual({ held: 0, payoutDue: 0, paidOut: 9000 });
   });
 
   it('validates payout details', async () => {

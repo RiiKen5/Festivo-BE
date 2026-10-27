@@ -45,6 +45,14 @@ exports.createBookingOrder = async (booking, amount) => {
     booking_id: booking._id.toString()
   });
 
+  // Fee locked on the booking; bookings made before fee terms existed are
+  // treated as customers Festivo brought. The cap covers the whole booking.
+  const feePercent = typeof booking.feePercent === 'number'
+    ? booking.feePercent
+    : policies.bookingFeePercent({ source: 'marketplace', founding: false });
+  const earlier = await Payment.find({ booking: booking._id, status: { $in: ['paid', 'partially_refunded'] } }).select('platformFee');
+  const feesTaken = earlier.reduce((sum, p) => sum + (p.platformFee || 0), 0);
+
   const payment = await Payment.create({
     kind: 'booking',
     booking: booking._id,
@@ -52,7 +60,8 @@ exports.createBookingOrder = async (booking, amount) => {
     payer: booking.organizer,
     payee: booking.vendor,
     amount: toPay,
-    feePercent: policies.bookingCommissionPercent(),
+    feePercent,
+    feeCap: round2(Math.max(0, policies.bookingFeeCap() - feesTaken)),
     razorpayOrderId: order.id
   });
 
@@ -166,6 +175,9 @@ const applyBookingPayment = async (payment) => {
 
   await require('./chatService').postBookingUpdate(booking, booking.organizer,
     `Paid ₹${payment.amount} online. Festivo holds it until the job is done.`);
+
+  // Paid within the early-release window: the advance is due straight away
+  await require('./payoutService').releaseAdvances({ bookingId: booking._id });
 };
 
 const applyTicketPayment = async (payment) => {
@@ -228,6 +240,7 @@ const refundPayment = async (payment, share, reason) => {
   }
 
   payment.recalculateSplit();
+  await require('./payoutService').settleAdvanceAfterRefund(payment);
   await payment.save();
   return amount >= 1 ? amount : 0;
 };
@@ -248,6 +261,7 @@ exports.refundBookingPayments = async (booking, share, reason) => {
     refunded += await refundPayment(payment, share, reason);
     if (payment.payoutStatus === 'not_due' && payment.payeeAmount > 0) {
       payment.payoutStatus = 'pending';
+      payment.payoutDueBy = new Date(Date.now() + policies.payoutPromiseHours() * 60 * 60 * 1000);
       await payment.save();
     }
   }
@@ -280,11 +294,19 @@ exports.refundTicket = async (rsvp, share, reason) => {
   return round2(refunded);
 };
 
-// Booking completed: the vendor's share of its payments is now due
-exports.releaseBookingPayouts = (bookingId) => Payment.updateMany(
-  { booking: bookingId, status: { $in: ['paid', 'partially_refunded'] }, payoutStatus: 'not_due' },
-  { payoutStatus: 'pending' }
-);
+// Booking completed: the vendor's share of its payments is now due, within
+// the payout promise. An advance not sent yet is folded into this payout.
+exports.releaseBookingPayouts = async (bookingId) => {
+  const dueBy = new Date(Date.now() + policies.payoutPromiseHours() * 60 * 60 * 1000);
+  await Payment.updateMany(
+    { booking: bookingId, 'advance.status': 'pending' },
+    { 'advance.status': 'cancelled' }
+  );
+  return Payment.updateMany(
+    { booking: bookingId, status: { $in: ['paid', 'partially_refunded'] }, payoutStatus: 'not_due' },
+    { payoutStatus: 'pending', payoutDueBy: dueBy }
+  );
+};
 
 // Event took place: the organizer's ticket revenue is now due
 exports.releaseTicketPayouts = (eventId) => Payment.updateMany(

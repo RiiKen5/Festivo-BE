@@ -17,8 +17,18 @@ exports.getConfig = (req, res) => {
   res.json(ApiResponse.success({
     enabled: paymentService.isConfigured(),
     keyId: process.env.RAZORPAY_KEY_ID || null,
-    bookingCommissionPercent: policies.bookingCommissionPercent(),
-    ticketFeePercent: policies.ticketFeePercent()
+    ticketFeePercent: policies.ticketFeePercent(),
+    bookingFees: {
+      ownPercent: policies.bookingFeePercent({ source: 'vendor_link', founding: false }),
+      newPercent: policies.bookingFeePercent({ source: 'marketplace', founding: false }),
+      foundingOwnPercent: policies.bookingFeePercent({ source: 'vendor_link', founding: true }),
+      foundingNewPercent: policies.bookingFeePercent({ source: 'marketplace', founding: true }),
+      cap: policies.bookingFeeCap(),
+      foundingUntil: policies.foundingUntil(),
+      foundingOpen: policies.foundingOpen(),
+      earlyReleaseDays: policies.earlyReleaseDays(),
+      payoutPromiseHours: policies.payoutPromiseHours()
+    }
   }, 'Payment config retrieved'));
 };
 
@@ -170,7 +180,7 @@ exports.getMyPayments = catchAsync(async (req, res, next) => {
       .skip((page - 1) * limit)
       .lean(),
     Payment.countDocuments(query),
-    role === 'payee' ? earningsSummary(req.user._id) : null
+    role === 'payee' ? require('../services/payoutService').earningsSummary(req.user._id) : null
   ]);
 
   res.json({
@@ -178,16 +188,3 @@ exports.getMyPayments = catchAsync(async (req, res, next) => {
     summary
   });
 });
-
-const earningsSummary = async (userId) => {
-  const rows = await Payment.aggregate([
-    { $match: { payee: userId, status: { $in: ['paid', 'partially_refunded'] } } },
-    { $group: { _id: '$payoutStatus', amount: { $sum: '$payeeAmount' } } }
-  ]);
-  const byStatus = Object.fromEntries(rows.map(r => [r._id, Math.round(r.amount * 100) / 100]));
-  return {
-    held: byStatus.not_due || 0,
-    payoutDue: byStatus.pending || 0,
-    paidOut: byStatus.paid || 0
-  };
-};

@@ -170,7 +170,7 @@ exports.getUserProfile = catchAsync(async (req, res, next) => {
 // @route   PUT /api/v1/users/:id
 // @access  Private/Admin
 exports.updateUser = catchAsync(async (req, res, next) => {
-  const allowedFields = ['name', 'email', 'phone', 'city', 'userType', 'isActive', 'isVerified', 'isBanned', 'role'];
+  const allowedFields = ['name', 'email', 'phone', 'city', 'userType', 'isActive', 'isVerified', 'isBanned', 'role', 'foundingVendor'];
   const updates = {};
 
   allowedFields.forEach(field => {

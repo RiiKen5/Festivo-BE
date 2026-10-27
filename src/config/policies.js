@@ -9,8 +9,41 @@ const percentFromEnv = (name, fallback) => {
 const HOUR = 60 * 60 * 1000;
 
 module.exports = {
-  // Platform commission taken from each online vendor booking payment
-  bookingCommissionPercent: () => percentFromEnv('BOOKING_COMMISSION_PERCENT', 15),
+  /**
+   * Festivo's fee on a vendor booking (Founding Vendor Plan). Lower on the
+   * vendor's own customers (who came through the vendor's shared link) than
+   * on customers Festivo brought. Founding vendors pay less until the
+   * founding terms end.
+   * @param {object} terms
+   * @param {'vendor_link'|'marketplace'} terms.source
+   * @param {boolean} terms.founding - Vendor holds founding terms right now
+   * @returns {number} - Percent
+   */
+  bookingFeePercent: ({ source, founding }) => {
+    const own = source === 'vendor_link';
+    if (founding) {
+      return own ? percentFromEnv('FOUNDING_FEE_OWN_PERCENT', 0) : percentFromEnv('FOUNDING_FEE_NEW_PERCENT', 5);
+    }
+    return own ? percentFromEnv('BOOKING_FEE_OWN_PERCENT', 3) : percentFromEnv('BOOKING_FEE_NEW_PERCENT', 10);
+  },
+
+  // Most Festivo takes from one booking, in rupees
+  bookingFeeCap: () => {
+    const value = parseFloat(process.env.BOOKING_FEE_CAP);
+    return Number.isFinite(value) && value >= 0 ? value : 1000;
+  },
+
+  // Founding terms: the first 50 vendors, through 31 January 2027 (IST)
+  foundingVendorLimit: () => parseInt(process.env.FOUNDING_VENDOR_LIMIT, 10) || 50,
+  foundingUntil: () => new Date(process.env.FOUNDING_UNTIL || '2027-02-01T00:00:00+05:30'),
+  foundingOpen: (now = new Date()) => now < module.exports.foundingUntil(),
+
+  // Verified vendors get this share of their money this many days before the event
+  earlyReleaseDays: () => 7,
+  earlyReleaseShare: () => 0.5,
+
+  // Payout promise: sent within this many hours of becoming due, or no fee
+  payoutPromiseHours: () => 24,
 
   // Platform fee taken from each paid event ticket
   ticketFeePercent: () => percentFromEnv('TICKET_FEE_PERCENT', 5),

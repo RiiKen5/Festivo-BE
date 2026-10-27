@@ -87,6 +87,7 @@ exports.reportProblem = async (booking, organizer, { reason, details }, now = ne
   const respondBy = new Date(now.getTime() + policies.disputeResponseHours() * HOUR);
   booking.dispute = { status: 'open', reason, details: text, openedAt: now, respondBy };
   await booking.save();
+  await require('./payoutService').holdAdvances(booking._id);
 
   const what = reason === 'no_show' ? 'did not arrive' : 'did not deliver what was agreed';
   await notify(booking.vendor, booking, 'Problem Reported',

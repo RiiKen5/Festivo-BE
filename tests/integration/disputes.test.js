@@ -179,7 +179,7 @@ describe('reporting a problem', () => {
     expect(booking.status).toBe('completed');
     const payment = await Payment.findOne({ booking: bookingId });
     expect(payment.payoutStatus).toBe('pending');
-    expect(payment.payeeAmount).toBe(5950); // 7,000 kept less 15%
+    expect(payment.payeeAmount).toBe(6300); // 7,000 kept less 10%
 
     // The ₹500 penalty comes out of this payout
     const payouts = await request(app).get('/api/v1/admin/payouts').set(auth(admin.token));

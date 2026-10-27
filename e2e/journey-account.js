@@ -97,7 +97,9 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await page.goto(`${APP}/notifications`); await step(page, '8_notifications');
   } catch (e) {
     console.log('✗ FAILED:', e.message.split('\n').slice(0, 3).join(' '));
+    process.exitCode = 1;
   }
   await browser.close();
   console.log('\nISSUES:\n' + ([...new Set(issues.flat())].join('\n') || 'none'));
+  if (issues.flat().length) process.exitCode = 1;
 })();

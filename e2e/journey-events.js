@@ -82,7 +82,9 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().split('T')[
     console.log('   attendee notified:', await att.page.getByText(/cancelled/i).count() > 0);
   } catch (e) {
     console.log('✗ FAILED:', e.message.split('\n').slice(0, 3).join(' '));
+    process.exitCode = 1;
   }
   await browser.close();
   console.log('\nISSUES:\n' + ([...new Set(issues.flat())].join('\n') || 'none'));
+  if (issues.flat().length) process.exitCode = 1;
 })();

@@ -4,18 +4,24 @@ const Notification = require('../models/Notification');
 const checkoutService = require('../services/checkoutService');
 const reviewRequests = require('../services/reviewRequestService');
 const disputeService = require('../services/disputeService');
+const payoutService = require('../services/payoutService');
 
 const DAY = 24 * 60 * 60 * 1000;
 
 // Organizers sometimes forget to mark things complete, which would leave
 // vendors and ticket revenue unpaid forever. Close them out automatically.
 const BOOKING_GRACE_DAYS = 3; // time for the organizer to raise a problem
+// Vendor confirmed arrival with the organizer's code: pay them sooner
+const ARRIVED_GRACE_DAYS = 1;
 const EVENT_GRACE_DAYS = 1;
 
 const completeOverdueBookings = async (now = new Date()) => {
   const bookings = await Booking.find({
     status: { $in: ['confirmed', 'in_progress'] },
-    eventDate: { $lt: new Date(now - BOOKING_GRACE_DAYS * DAY) },
+    $or: [
+      { eventDate: { $lt: new Date(now - BOOKING_GRACE_DAYS * DAY) } },
+      { arrivedAt: { $exists: true }, eventDate: { $lt: new Date(now - ARRIVED_GRACE_DAYS * DAY) } }
+    ],
     // A reported problem keeps the payout frozen until it is settled
     'dispute.status': { $ne: 'open' }
   });
@@ -59,9 +65,11 @@ const completePastEvents = async (now = new Date()) => {
 
 const run = async () => {
   try {
-    const [bookings, events, reminders, disputes] = await Promise.all([
-      completeOverdueBookings(), completePastEvents(), reviewRequests.sendDueReminders(), disputeService.resolveOverdue()
+    const [bookings, events, reminders, disputes, advances] = await Promise.all([
+      completeOverdueBookings(), completePastEvents(), reviewRequests.sendDueReminders(), disputeService.resolveOverdue(),
+      payoutService.releaseAdvances()
     ]);
+    if (advances) console.log(`[auto-complete] ${advances} early advance(s) now due`);
     if (reminders) console.log(`[auto-complete] ${reminders} review reminder(s) sent`);
     if (disputes) console.log(`[auto-complete] ${disputes} unanswered problem report(s) refunded`);
     if (bookings || events) {

@@ -188,6 +188,13 @@ const userSchema = new mongoose.Schema({
     default: 0,
     min: 0
   },
+  // Founding Vendor Plan: one of the first vendors, on lower fees until the
+  // founding terms end
+  foundingVendor: {
+    type: Boolean,
+    default: false
+  },
+  foundingVendorAt: Date,
   role: {
     type: String,
     enum: ['user', 'admin'],

@@ -10,6 +10,8 @@ const bookingService = require('../services/bookingService');
 const chatService = require('../services/chatService');
 const availability = require('../services/availabilityService');
 const disputeService = require('../services/disputeService');
+const User = require('../models/User');
+const policies = require('../config/policies');
 
 const prettyDay = (date) => new Date(date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 const UNAVAILABLE = {
@@ -126,7 +128,7 @@ exports.getBooking = catchAsync(async (req, res, next) => {
 // @route   POST /api/v1/bookings
 // @access  Private
 exports.createBooking = catchAsync(async (req, res, next) => {
-  const { eventId, serviceId, eventDate, priceAgreed, notes, requirements } = req.body;
+  const { eventId, serviceId, eventDate, priceAgreed, notes, requirements, viaVendorLink } = req.body;
 
   // Get event and service
   const event = await Event.findById(eventId);
@@ -179,6 +181,13 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     ? priceAgreed
     : service.basePrice * (service.priceUnit === 'per_person' ? event.expectedGuests : 1);
 
+  // Fee terms are locked now. A returning customer keeps the source of
+  // their first booking with this vendor.
+  const earlier = await Booking.findOne({ organizer: req.user._id, vendor: service.provider }).sort('createdAt').select('source');
+  const source = earlier ? earlier.source : (viaVendorLink === true ? 'vendor_link' : 'marketplace');
+  const vendor = await User.findById(service.provider).select('foundingVendor');
+  const foundingTerms = !!(vendor && vendor.foundingVendor && policies.foundingOpen());
+
   const booking = await Booking.create({
     event: eventId,
     service: serviceId,
@@ -186,6 +195,9 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     vendor: service.provider,
     eventDate: bookingDate,
     priceAgreed: proposedPrice,
+    source,
+    foundingTerms,
+    feePercent: policies.bookingFeePercent({ source, founding: foundingTerms }),
     notes,
     requirements
   });

@@ -88,13 +88,15 @@ const step = async (page, name) => { await settle(page); await page.screenshot({
     await adm.page.goto(`${APP}/admin`); await settle(adm.page);
     await adm.page.getByRole('button', { name: /^Payouts/ }).click(); await step(adm.page, '8_payouts');
     await adm.page.locator('input[placeholder="UTR / reference"]').first().fill('UTR998877');
-    await adm.page.getByRole('button', { name: 'Mark paid' }).first().click(); await step(adm.page, '8_paid');
+    await adm.page.getByRole('button', { name: 'Mark sent' }).first().click(); await step(adm.page, '8_paid');
     await adm.page.getByRole('button', { name: /Vendor verification/ }).click(); await settle(adm.page);
     await adm.page.getByRole('button', { name: 'Verify' }).first().click(); await step(adm.page, '8_verified');
     await adm.page.getByRole('button', { name: 'Overview' }).click(); await step(adm.page, '8_overview');
   } catch (e) {
     console.log('✗ FAILED:', e.message.split('\n').slice(0, 3).join(' '));
+    process.exitCode = 1;
   }
   await browser.close();
   console.log('\nISSUES:\n' + ([...new Set(issues.flat())].join('\n') || 'none'));
+  if (issues.flat().length) process.exitCode = 1;
 })();

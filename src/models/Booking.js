@@ -40,6 +40,16 @@ const bookingSchema = new mongoose.Schema({
     default: 'pending'
   },
 
+  // Where the customer came from: the vendor's own shared link, or Festivo.
+  // Sets Festivo's fee, which is locked when the booking is made.
+  source: {
+    type: String,
+    enum: ['vendor_link', 'marketplace'],
+    default: 'marketplace'
+  },
+  feePercent: Number,
+  foundingTerms: Boolean,
+
   // Payment
   priceAgreed: {
     type: Number,

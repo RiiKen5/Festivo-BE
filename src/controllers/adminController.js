@@ -11,6 +11,7 @@ const ApiError = require('../utils/apiError');
 const ApiResponse = require('../utils/apiResponse');
 
 const disputeService = require('../services/disputeService');
+const payoutService = require('../services/payoutService');
 
 const round2 = (n) => Math.round((n || 0) * 100) / 100;
 
@@ -30,10 +31,7 @@ exports.getStats = catchAsync(async (req, res, next) => {
       Booking.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       moneyTotals(collected),
       moneyTotals({ ...collected, paidAt: { $gte: since } }),
-      Payment.aggregate([
-        { $match: { payoutStatus: 'pending' } },
-        { $group: { _id: null, amount: { $sum: '$payeeAmount' }, count: { $sum: 1 } } }
-      ]),
+      payoutService.duePayouts({ limit: 1000 }),
       Service.countDocuments({ isVerified: false, isActive: true }),
       Review.countDocuments({ $or: [{ isFlagged: true }, { 'reports.0': { $exists: true } }], isApproved: true }),
       Booking.countDocuments({ 'dispute.status': 'open' })
@@ -45,7 +43,8 @@ exports.getStats = catchAsync(async (req, res, next) => {
     events,
     bookings: Object.fromEntries(bookingsByStatus.map(b => [b._id, b.count])),
     money: { allTime: money, last30Days: money30d },
-    payoutsDue: { amount: round2(payouts[0] && payouts[0].amount), count: (payouts[0] && payouts[0].count) || 0 },
+    payoutsDue: { amount: round2(payouts.reduce((sum, p) => sum + p.amountDue, 0)), count: payouts.length },
+    foundingVendors: await User.countDocuments({ foundingVendor: true }),
     pendingVerification,
     flaggedReviews,
     openDisputes
@@ -77,6 +76,11 @@ const moneyTotals = async (match) => {
 // @access  Admin
 exports.getPayouts = catchAsync(async (req, res, next) => {
   const { status = 'pending', page = 1, limit = 50 } = req.query;
+  // Due now: early advances and final payouts, soonest deadline first
+  if (status === 'pending') {
+    const items = await payoutService.duePayouts();
+    return res.json(ApiResponse.success(items, 'Payouts retrieved'));
+  }
   const query = { payoutStatus: status, status: { $in: ['paid', 'partially_refunded', 'refunded'] } };
 
   const [payments, total] = await Promise.all([
@@ -97,47 +101,29 @@ exports.getPayouts = catchAsync(async (req, res, next) => {
 // @route   POST /api/v1/admin/payouts/:id/mark-paid
 // @access  Admin
 exports.markPayoutPaid = catchAsync(async (req, res, next) => {
-  const { reference } = req.body;
+  const { reference, part = 'final' } = req.body;
   if (!reference) {
     return next(new ApiError('Transfer reference (UTR) is required', 400));
   }
 
-  // A no-show penalty owed by the payee is taken out of this payout
-  const pending = await Payment.findOne({ _id: req.params.id, payoutStatus: 'pending' });
-  if (!pending) {
+  const result = await payoutService.markSent(req.params.id, { part, reference, admin: req.user });
+  if (!result) {
     return next(new ApiError('No pending payout found', 404));
   }
-  const payee = await User.findById(pending.payee).select('penaltyDue');
-  const deducted = round2(Math.min(payee ? payee.penaltyDue : 0, pending.payeeAmount));
+  const { payment, sent, deducted, feeWaived } = result;
 
-  const payment = await Payment.findOneAndUpdate(
-    { _id: req.params.id, payoutStatus: 'pending' },
-    {
-      payoutStatus: 'paid', payoutReference: reference, paidOutAt: new Date(), paidOutBy: req.user._id,
-      penaltyDeducted: deducted
-    },
-    { new: true }
-  );
-
-  if (!payment) {
-    return next(new ApiError('No pending payout found', 404));
-  }
-  if (deducted > 0) {
-    await User.updateOne({ _id: payment.payee }, { $inc: { penaltyDue: -deducted } });
-  }
-
-  const sent = round2(payment.payeeAmount - deducted);
+  const what = part === 'advance' ? 'Your advance of' : '';
   await Notification.createNotification({
     recipient: payment.payee,
     type: 'payment',
-    title: 'Payout Sent',
-    message: `₹${sent} has been sent to your account (ref ${reference})${deducted ? `, after a ₹${deducted} no-show penalty` : ''}`,
+    title: part === 'advance' ? 'Advance Sent' : 'Payout Sent',
+    message: `${what ? what + ' ' : ''}₹${sent} has been sent to your account (ref ${reference})${deducted ? `, after ₹${deducted} owed to Festivo` : ''}${feeWaived ? '. It was late, so there is no Festivo fee on this payment.' : ''}`,
     relatedBooking: payment.booking,
     relatedEvent: payment.event,
     actionUrl: '/dashboard'
   });
 
-  res.json(ApiResponse.success(payment, 'Payout marked as paid'));
+  res.json(ApiResponse.success({ ...payment.toObject(), sent, penaltyDeducted: deducted, feeWaived }, 'Payout marked as paid'));
 });
 
 // @desc    Services awaiting verification

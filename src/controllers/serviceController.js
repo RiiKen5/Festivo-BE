@@ -17,6 +17,15 @@ const EDITABLE_SERVICE_FIELDS = [
 ];
 const { clearCache } = require('../middlewares/cache');
 
+// The first vendors to list, while founding terms are open, get them
+const claimFoundingSpot = async (user) => {
+  const policies = require('../config/policies');
+  if (user.foundingVendor || !policies.foundingOpen()) return;
+  const taken = await User.countDocuments({ foundingVendor: true });
+  if (taken >= policies.foundingVendorLimit()) return;
+  await User.updateOne({ _id: user._id, foundingVendor: { $ne: true } }, { foundingVendor: true, foundingVendorAt: new Date() });
+};
+
 // Vendors with verified no-shows always rank below everyone else
 const ranked = (sort) => `noShowCount ${typeof sort === 'string' ? sort : '-ratingAverage'}`;
 
@@ -136,6 +145,8 @@ exports.createService = catchAsync(async (req, res, next) => {
   if (req.user.userType === 'attendee') {
     await User.findByIdAndUpdate(req.user._id, { userType: 'helper' });
   }
+
+  await claimFoundingSpot(req.user);
 
   // Clear cache
   await clearCache('/api/v1/services');
