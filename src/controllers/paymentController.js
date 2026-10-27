@@ -127,6 +127,15 @@ exports.verifyGuestPayment = catchAsync(async (req, res, next) => {
   }
 
   await checkoutService.capturePayment({ orderId, paymentId });
+
+  // Email the ticket if the guest gave an address
+  const paid = await RSVP.findById(rsvp._id).select('+guestEmail');
+  if (paid.guestEmail && paid.status === 'going') {
+    const event = await Event.findById(paid.event).select('+inviteCode');
+    require('./rsvpController').emailGuestTicket({
+      email: paid.guestEmail, name: paid.guestName, event, rsvp: paid, token: guestToken, paid: true
+    });
+  }
   res.json(ApiResponse.success({ status: 'paid' }, 'Payment successful'));
 });
 

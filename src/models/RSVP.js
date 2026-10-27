@@ -33,6 +33,14 @@ const rsvpSchema = new mongoose.Schema({
     type: String,
     select: false
   },
+  // Optional; only used to send the guest their check-in code and a link
+  // back to their RSVP. Not shown to the host.
+  guestEmail: {
+    type: String,
+    select: false,
+    lowercase: true,
+    trim: true
+  },
 
   // RSVP Status
   status: {

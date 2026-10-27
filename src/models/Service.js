@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeCity } = require('../utils/helpers');
 const slugify = require('slugify');
 
 const serviceSchema = new mongoose.Schema({
@@ -67,6 +68,8 @@ const serviceSchema = new mongoose.Schema({
   // Location
   city: {
     type: String,
+    // Stored by its standard name, e.g. "Banglore" -> "Bengaluru"
+    set: normalizeCity,
     required: true
   },
   serviceAreas: [String],

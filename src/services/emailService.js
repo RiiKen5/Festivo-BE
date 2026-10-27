@@ -220,30 +220,56 @@ class EmailService {
     });
   }
 
-  async sendNewBookingRequestToVendor(booking, organizer, service, event) {
+  // A guest without an account: their check-in code, and a private link
+  // that brings their RSVP or ticket back on any device
+  async sendGuestTicket({ to, name, event, checkInCode, paid, link }) {
+    const escape = (text) => String(text || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const when = new Date(event.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #6366f1;">New Booking Request</h1>
-        <p>You have a new booking request!</p>
-        <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-          <p><strong>Service:</strong> ${service.serviceName}</p>
-          <p><strong>From:</strong> ${organizer.name}</p>
-          <p><strong>Event:</strong> ${event.title}</p>
-          <p><strong>Date:</strong> ${new Date(booking.eventDate).toLocaleDateString()}</p>
-          <p><strong>Proposed Amount:</strong> ₹${booking.priceAgreed}</p>
-        </div>
-        <p>Please review and respond to this request as soon as possible.</p>
-        <a href="${frontendUrl()}/bookings/${booking._id}"
+        <h1 style="color: #6366f1; font-size: 22px;">${paid ? 'Your ticket' : "You're on the list"}: ${escape(event.title)}</h1>
+        <p>Hi ${escape(name)},</p>
+        <p>${escape(when)}${event.time ? ` at ${escape(event.time)}` : ''}${event.locationName ? `, ${escape(event.locationName)}` : ''}.</p>
+        <p style="font-size: 14px; color: #6b7280; margin-bottom: 4px;">Your check-in code</p>
+        <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; margin-top: 0;">${escape(checkInCode)}</p>
+        <p>Show this code at the door.</p>
+        <a href="${link}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-          Review Request
+          ${paid ? 'View or cancel your ticket' : 'View or change your RSVP'}
         </a>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">This link is private to you. Anyone with it can change or cancel your ${paid ? 'ticket' : 'RSVP'}, so don't forward it.</p>
+      </div>
+    `;
+    return this.sendEmail({
+      to,
+      subject: `${paid ? 'Your ticket' : "You're on the list"}: ${event.title} - Festivo`,
+      html,
+      text: `${event.title}, ${when}\nYour check-in code: ${checkInCode}\n${link}`
+    });
+  }
+
+  // An in-app notification, also sent by email
+  async sendNotificationEmail(user, notification) {
+    const escape = (text) => String(text || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const link = `${frontendUrl()}${notification.actionUrl || '/notifications'}`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #6366f1; font-size: 22px;">${escape(notification.title)}</h1>
+        <p>Hi ${escape(user.name)},</p>
+        <p>${escape(notification.message)}</p>
+        <a href="${link}"
+           style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+          Open in Festivo
+        </a>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">You get this email because of activity on your Festivo bookings or events.</p>
       </div>
     `;
 
     return this.sendEmail({
-      to: service.provider.email,
-      subject: 'New Booking Request - Festivo',
-      html
+      to: user.email,
+      subject: `${notification.title} - Festivo`,
+      html,
+      text: `${notification.title}\n\n${notification.message}\n\n${link}`
     });
   }
 }

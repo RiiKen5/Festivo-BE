@@ -207,7 +207,7 @@ exports.createBooking = catchAsync(async (req, res, next) => {
     recipient: service.provider,
     type: 'booking',
     title: 'New Booking Request',
-    message: `You have a new booking request for ${service.serviceName}`,
+    message: `${req.user.name} wants to book ${service.serviceName} on ${prettyDay(bookingDate)} (proposed ₹${proposedPrice.toLocaleString('en-IN')}). Accept with your price, or decline. They pay only after you accept.`,
     relatedBooking: booking._id,
     relatedEvent: eventId,
     actionUrl: `/bookings/${booking._id}`

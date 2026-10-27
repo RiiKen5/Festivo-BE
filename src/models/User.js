@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizeCity } = require('../utils/helpers');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -49,6 +50,8 @@ const userSchema = new mongoose.Schema({
   },
   city: {
     type: String,
+    // Stored by its standard name, e.g. "Banglore" -> "Bengaluru"
+    set: normalizeCity,
     required: [true, 'City is required']
   },
   location: {

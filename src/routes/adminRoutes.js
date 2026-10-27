@@ -11,6 +11,8 @@ router.get('/growth', adminController.getGrowth);
 router.get('/payouts', adminController.getPayouts);
 router.post('/payouts/:id/mark-paid', paramValidations.mongoId, validate, adminController.markPayoutPaid);
 router.get('/disputes', adminController.getDisputes);
+router.get('/vendors', adminController.getVendors);
+router.post('/vendors/:id/founding', paramValidations.mongoId, validate, adminController.setFoundingVendor);
 router.post('/disputes/:id/resolve', paramValidations.mongoId, validate, adminController.resolveDispute);
 router.get('/services/unverified', adminController.getUnverifiedServices);
 router.get('/reviews/flagged', adminController.getFlaggedReviews);

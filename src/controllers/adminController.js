@@ -259,3 +259,67 @@ exports.resolveDispute = catchAsync(async (req, res, next) => {
   const result = await disputeService.resolve(booking, req.user, { resolution, amount, noShow, penalty, note });
   res.json(ApiResponse.success(result, 'Dispute resolved'));
 });
+
+// @desc    Vendors with active listings, and their founding status
+// @route   GET /api/v1/admin/vendors
+// @access  Admin
+exports.getVendors = catchAsync(async (req, res, next) => {
+  const listings = await Service.aggregate([
+    { $match: { isActive: true } },
+    { $group: { _id: '$provider', services: { $sum: 1 }, names: { $push: '$serviceName' }, verified: { $max: '$isVerified' }, firstListed: { $min: '$createdAt' } } }
+  ]);
+  const users = await User.find({ _id: { $in: listings.map(l => l._id) } })
+    .select('name email phone city foundingVendor foundingVendorAt noShowCount')
+    .lean();
+  const byId = Object.fromEntries(listings.map(l => [l._id.toString(), l]));
+  const vendors = users
+    .map(u => ({ ...u, ...byId[u._id.toString()], _id: u._id }))
+    .sort((a, b) => new Date(a.firstListed) - new Date(b.firstListed));
+
+  const policies = require('../config/policies');
+  res.json(ApiResponse.success({
+    vendors,
+    founding: {
+      taken: await User.countDocuments({ foundingVendor: true }),
+      limit: policies.foundingVendorLimit(),
+      open: policies.foundingOpen(),
+      until: policies.foundingUntil()
+    }
+  }, 'Vendors retrieved'));
+});
+
+// @desc    Grant or remove founding terms for a vendor
+// @route   POST /api/v1/admin/vendors/:id/founding   { founding: boolean }
+// @access  Admin
+exports.setFoundingVendor = catchAsync(async (req, res, next) => {
+  const policies = require('../config/policies');
+  const founding = req.body.founding === true;
+  const user = await User.findById(req.params.id);
+  if (!user) {
+    return next(new ApiError('Vendor not found', 404));
+  }
+  if (founding && !user.foundingVendor) {
+    if (!policies.foundingOpen()) {
+      return next(new ApiError('The founding offer has ended', 400));
+    }
+    if (await User.countDocuments({ foundingVendor: true }) >= policies.foundingVendorLimit()) {
+      return next(new ApiError(`All ${policies.foundingVendorLimit()} founding spots are taken`, 400));
+    }
+  }
+
+  user.foundingVendor = founding;
+  user.foundingVendorAt = founding ? (user.foundingVendorAt || new Date()) : undefined;
+  await user.save({ validateBeforeSave: false });
+
+  if (founding) {
+    await Notification.createNotification({
+      recipient: user._id,
+      type: 'system',
+      title: "You're a founding vendor",
+      message: 'You pay 0% on customers who book through your own Festivo link and 5% on new customers, until the founding offer ends. New bookings get these rates.',
+      actionUrl: '/dashboard/my-services'
+    });
+  }
+
+  res.json(ApiResponse.success({ _id: user._id, foundingVendor: user.foundingVendor }, founding ? 'Founding terms granted' : 'Founding terms removed'));
+});

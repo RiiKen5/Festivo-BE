@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const { normalizeCity } = require('../utils/helpers');
 const slugify = require('slugify');
 
 const eventSchema = new mongoose.Schema({
@@ -71,6 +72,8 @@ const eventSchema = new mongoose.Schema({
   },
   city: {
     type: String,
+    // Stored by its standard name, e.g. "Banglore" -> "Bengaluru"
+    set: normalizeCity,
     required: true
   },
 

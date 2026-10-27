@@ -473,6 +473,8 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('You can bring up to 10 people', 400));
   }
   if (phone === undefined) return next(new ApiError('Please enter a valid 10-digit mobile number, or leave it empty', 400));
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return next(new ApiError('Please enter a valid email, or leave it empty', 400));
   if (!require('mongoose').isValidObjectId(eventId)) return next(new ApiError('Event not found', 404));
 
   const event = await Event.findById(eventId).select('+inviteCode');
@@ -524,6 +526,7 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
     rsvp.status = savedStatus;
     rsvp.guestsCount = guestsCount;
     if (phone) rsvp.guestPhone = phone;
+    if (email) rsvp.guestEmail = email;
     rsvp.guestTokenHash = hashToken(token);
     await rsvp.save();
   } else {
@@ -531,6 +534,7 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
       event: eventId,
       guestName: name,
       guestPhone: phone || undefined,
+      guestEmail: email || undefined,
       guestTokenHash: hashToken(token),
       status: savedStatus,
       guestsCount
@@ -543,6 +547,10 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
       { rsvp: guestView(rsvp), guestToken: token, checkout },
       'Complete payment to confirm your ticket'
     ));
+  }
+
+  if (email && status === 'going') {
+    emailGuestTicket({ email, name, event, rsvp, token, paid: false });
   }
 
   if (isNew && status === 'going') {
@@ -558,6 +566,23 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
 
   res.status(isNew ? 201 : 200).json(ApiResponse.success({ rsvp: guestView(rsvp), guestToken: token }, 'RSVP saved'));
 });
+
+// A private link that brings a guest's RSVP back on any device
+const guestLink = (event, token) => {
+  const { frontendUrl } = require('../config/frontend');
+  const invite = !event.isPublic && event.inviteCode ? `&invite=${encodeURIComponent(event.inviteCode)}` : '';
+  return `${frontendUrl()}/events/${event.slug}?guest=${encodeURIComponent(token)}${invite}`;
+};
+
+// Sent in the background; a slow mail server never holds up the RSVP
+const emailGuestTicket = ({ email, name, event, rsvp, token, paid }) => {
+  setImmediate(() => {
+    require('../services/emailService').sendGuestTicket({
+      to: email, name, event, checkInCode: rsvp.checkInCode, paid, link: guestLink(event, token)
+    }).catch(error => console.error('Could not email guest ticket:', error.message));
+  });
+};
+exports.emailGuestTicket = emailGuestTicket;
 
 // @desc    A guest's own RSVP, from their private token
 // @route   GET /api/v1/rsvps/guest?token=

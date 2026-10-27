@@ -40,6 +40,15 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
   // Comes back later on the same phone and changes the answer
   await page.reload(); await settle(page);
   check(await until(() => page.locator('.rsvp-status-card').first().isVisible()), 'answer remembered on return');
+
+  // On a different phone, the private link from the guest's email brings the RSVP back
+  const token = await page.evaluate(id => localStorage.getItem('festivo_guest_rsvp_' + id), String(party._id));
+  const other = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const otherPage = await other.newPage();
+  await otherPage.goto(`${APP}/events/${party.slug}?guest=${encodeURIComponent(token)}&invite=${inviteCode}`); await settle(otherPage);
+  check(await until(() => otherPage.locator('.rsvp-status-card').first().innerText().then(t => t.includes('Asha Rao'))), 'email link restores the RSVP on another phone');
+  check(!otherPage.url().includes('guest='), 'private token removed from the address bar');
+  await other.close();
   await page.getByRole('button', { name: 'Change RSVP' }).click();
   await modal.getByRole('button', { name: /Maybe/ }).click();
   await modal.getByRole('button', { name: 'Update RSVP' }).click();

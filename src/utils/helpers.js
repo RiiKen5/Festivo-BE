@@ -35,10 +35,53 @@ exports.safeEqual = (a, b) => {
  * @param {string} city
  * @returns {RegExp}
  */
-exports.cityMatch = (city) => {
-  const escaped = String(city).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`^${escaped}$`, 'i');
+// Old names and common misspellings, by the name the city picker uses
+const CITY_ALIASES = {
+  Bengaluru: ['bangalore', 'banglore', 'bengalore', 'bangaluru', 'bengluru', 'blr', 'bengaluru'],
+  Mumbai: ['bombay'],
+  Kolkata: ['calcutta'],
+  Chennai: ['madras'],
+  Delhi: ['new delhi'],
+  Gurugram: ['gurgaon'],
+  Mysuru: ['mysore'],
+  Mangaluru: ['mangalore'],
+  Thiruvananthapuram: ['trivandrum'],
+  Kochi: ['cochin'],
+  Vadodara: ['baroda'],
+  Puducherry: ['pondicherry'],
+  Belagavi: ['belgaum'],
+  'Hubballi-Dharwad': ['hubli', 'hubballi', 'dharwad'],
+  Kozhikode: ['calicut'],
+  Thrissur: ['trichur'],
+  Varanasi: ['banaras', 'benares'],
+  Visakhapatnam: ['vizag'],
+  'Allahabad (Prayagraj)': ['allahabad', 'prayagraj'],
+  Pune: ['poona'],
+  Tiruchirappalli: ['trichy']
 };
+const CANONICAL_CITY = Object.fromEntries(
+  Object.entries(CITY_ALIASES).flatMap(([name, aliases]) => [[name.toLowerCase(), name], ...aliases.map(a => [a, name])])
+);
+const escapeRegex = (text) => String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The standard spelling of a city ("banglore" -> "Bengaluru"); unknown
+ * names are returned trimmed
+ */
+exports.normalizeCity = (city) => {
+  if (typeof city !== 'string') return city;
+  const trimmed = city.trim().replace(/\s+/g, ' ');
+  return CANONICAL_CITY[trimmed.toLowerCase()] || trimmed;
+};
+
+// Case-insensitive match on a city, including its old names and misspellings
+exports.cityMatch = (city) => {
+  const name = exports.normalizeCity(city);
+  const variants = [name, ...(CITY_ALIASES[name] || [])];
+  return new RegExp(`^(${variants.map(escapeRegex).join('|')})$`, 'i');
+};
+
+exports.CITY_ALIASES = CITY_ALIASES;
 
 /**
  * Calculate pagination offset

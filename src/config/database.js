@@ -19,6 +19,28 @@ const migrateRsvpIndex = async () => {
   }
 };
 
+// Listings, events and accounts saved before city names were standardised
+// ("Banglore", "Bangalore") are renamed so city search finds them
+const normalizeStoredCities = async () => {
+  try {
+    const { CITY_ALIASES, cityMatch } = require('../utils/helpers');
+    const models = ['Service', 'Event', 'User'].map(name => require(`../models/${name}`));
+    let renamed = 0;
+    for (const name of Object.keys(CITY_ALIASES)) {
+      for (const Model of models) {
+        const result = await Model.collection.updateMany(
+          { city: { $regex: cityMatch(name), $ne: name } },
+          { $set: { city: name } }
+        );
+        renamed += result.modifiedCount;
+      }
+    }
+    if (renamed) console.log(`Standardised ${renamed} city name(s)`);
+  } catch (error) {
+    console.error('City name clean-up failed:', error.message);
+  }
+};
+
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
@@ -31,6 +53,7 @@ const connectDB = async () => {
     isConnected = true;
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     await migrateRsvpIndex();
+    await normalizeStoredCities();
 
     // Handle connection events
     mongoose.connection.on('error', (err) => {
@@ -71,3 +94,4 @@ const getConnectionStatus = () => isConnected;
 
 module.exports = connectDB;
 module.exports.getConnectionStatus = getConnectionStatus;
+module.exports.normalizeStoredCities = normalizeStoredCities;

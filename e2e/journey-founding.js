@@ -60,6 +60,16 @@ const requestBooking = async (page, price) => {
   check(await priya.page.getByText('you receive ₹1,800 after Festivo\'s 10% fee (new customer from Festivo').isVisible(), 'quote shows what the vendor receives');
   await priya.page.screenshot({ path: 'shots/founding-quote.png', fullPage: false });
 
+  // Admin sees vendors and can remove or grant founding terms
+  const admin = await session(browser, 'admin'); issues.push(admin.issues);
+  await login(admin.page, 'admin@test.in');
+  await admin.page.goto(`${APP}/admin`); await settle(admin.page);
+  await admin.page.getByRole('button', { name: 'Vendors', exact: true }).click(); await settle(admin.page);
+  check(await admin.page.getByText(/Founding vendors: 1 of 50/).isVisible(), 'admin sees founding spots taken');
+  const priyaRow = admin.page.locator('.row-card', { hasText: 'Priya Cakes' });
+  await priyaRow.getByRole('button', { name: 'Make founding' }).click();
+  check(await until(() => admin.page.getByText(/Founding vendors: 2 of 50/).isVisible()), 'admin grants founding terms to an existing vendor');
+
   // The public page states the plan
   await org.page.goto(`${APP}/for-vendors`); await settle(org.page);
   check(await org.page.getByText('3% on your own customers, 10% on new customers').isVisible(), 'vendor page shows the fees');

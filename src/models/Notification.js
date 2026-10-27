@@ -98,8 +98,34 @@ notificationSchema.pre('save', function(next) {
 });
 
 // Static method to create notification with socket emit
+// Notifications important enough to also email, so people who aren't on
+// Festivo at the moment still find out (a vendor missing a booking request
+// loses the customer)
+const EMAILED_TITLES = new Set([
+  'New Booking Request', 'Booking Confirmed', 'Booking Cancelled', 'Payment Received',
+  'Advance on its way', 'Advance Sent', 'Payout Sent', 'Service Verified',
+  'Problem Reported', 'Vendor Replied', 'Problem Resolved', 'Event Cancelled', "You're a founding vendor"
+]);
+
+// Sent in the background: a slow or failing mail server never holds up the request
+const emailInBackground = (notification) => {
+  setImmediate(async () => {
+    try {
+      const User = mongoose.model('User');
+      const user = await User.findById(notification.recipient).select('email name');
+      if (!user || !user.email) return;
+      const sent = await require('../services/emailService').sendNotificationEmail(user, notification);
+      if (sent) await notification.constructor.updateOne({ _id: notification._id }, { $addToSet: { sentVia: 'email' } });
+    } catch (error) {
+      console.error(`Could not email notification ${notification._id}:`, error.message);
+    }
+  });
+};
+
 notificationSchema.statics.createNotification = async function(data) {
   const notification = await this.create(data);
+
+  if (EMAILED_TITLES.has(notification.title)) emailInBackground(notification);
 
   // Try to emit socket event for real-time notification
   try {
