@@ -15,6 +15,8 @@ router.use(protect);
 // Current user routes (must be before /:id routes)
 router.get('/me', userController.getMe);
 router.put('/me', userController.updateMe);
+router.delete('/me', userController.deleteMe);
+router.get('/me/deletion-check', userController.getDeletionCheck);
 router.get('/me/payout-details', userController.getPayoutDetails);
 router.put('/me/payout-details', userController.updatePayoutDetails);
 router.get('/me/calendar', userController.getMyCalendar);

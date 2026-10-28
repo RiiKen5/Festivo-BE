@@ -198,6 +198,8 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   foundingVendorAt: Date,
+  // Set when the user deletes their account; personal details are erased
+  deletedAt: Date,
   role: {
     type: String,
     enum: ['user', 'admin'],

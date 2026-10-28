@@ -112,8 +112,9 @@ const emailInBackground = (notification) => {
   setImmediate(async () => {
     try {
       const User = mongoose.model('User');
-      const user = await User.findById(notification.recipient).select('email name');
-      if (!user || !user.email) return;
+      const user = await User.findById(notification.recipient).select('email name notifications isActive');
+      // Respect the email setting on the profile; deleted accounts get nothing
+      if (!user || !user.email || !user.isActive || (user.notifications && user.notifications.email === false)) return;
       const sent = await require('../services/emailService').sendNotificationEmail(user, notification);
       if (sent) await notification.constructor.updateOne({ _id: notification._id }, { $addToSet: { sentVia: 'email' } });
     } catch (error) {

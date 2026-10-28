@@ -404,3 +404,22 @@ exports.updateMyCalendar = catchAsync(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
   res.json(ApiResponse.success({ blocked: user.blockedDays }, 'Calendar updated'));
 });
+
+// @desc    What would stop the current user deleting their account
+// @route   GET /api/v1/users/me/deletion-check
+// @access  Private
+exports.getDeletionCheck = catchAsync(async (req, res, next) => {
+  const blockers = await require('../services/accountService').deletionBlockers(req.user._id);
+  res.json(ApiResponse.success({ canDelete: blockers.length === 0, blockers }, 'Deletion check'));
+});
+
+// @desc    Delete my account (type DELETE to confirm)
+// @route   DELETE /api/v1/users/me
+// @access  Private
+exports.deleteMe = catchAsync(async (req, res, next) => {
+  if (req.body.confirm !== 'DELETE') {
+    return next(new ApiError('Type DELETE to confirm', 400));
+  }
+  await require('../services/accountService').deleteAccount(req.user._id);
+  res.json(ApiResponse.success(null, 'Your account has been deleted'));
+});
