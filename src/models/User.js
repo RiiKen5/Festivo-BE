@@ -198,6 +198,10 @@ const userSchema = new mongoose.Schema({
     default: false
   },
   foundingVendorAt: Date,
+  // Set up by an admin from the vendor's intake form; claimedAt is when the
+  // vendor first set their own password
+  onboardedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  claimedAt: Date,
   // Set when the user deletes their account; personal details are erased
   deletedAt: Date,
   role: {

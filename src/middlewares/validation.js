@@ -162,6 +162,22 @@ const serviceValidations = {
   ]
 };
 
+// An admin listing a vendor from their intake form: the vendor's details
+// plus their first service, checked like a vendor's own listing
+const adminValidations = {
+  createVendor: [
+    body('name').trim().isLength({ min: 2, max: 100 }).withMessage('Enter the vendor\'s name'),
+    body('email').trim().isEmail().withMessage('Enter a valid email'),
+    body('phone').trim().notEmpty().withMessage('Enter the vendor\'s WhatsApp number'),
+    body('city').trim().notEmpty().withMessage('City is required'),
+    body('service.serviceName').trim().isLength({ min: 3, max: 200 }).withMessage('Service name must be between 3 and 200 characters'),
+    body('service.category').isIn(['food', 'decor', 'photography', 'music', 'cleanup', 'entertainment', 'venue', 'other']).withMessage('Invalid category'),
+    body('service.description').trim().isLength({ min: 10, max: 2000 }).withMessage('Description must be between 10 and 2000 characters'),
+    body('service.basePrice').isFloat({ min: 0 }).withMessage('Base price must be a positive number'),
+    body('service.priceUnit').isIn(['per_event', 'per_hour', 'per_day', 'per_person']).withMessage('Invalid price unit')
+  ]
+};
+
 // Booking validations
 const bookingValidations = {
   create: [
@@ -277,6 +293,7 @@ module.exports = {
   authValidations,
   eventValidations,
   serviceValidations,
+  adminValidations,
   bookingValidations,
   reviewValidations,
   messageValidations,

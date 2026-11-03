@@ -357,6 +357,12 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   }
 
   user.password = newPassword;
+  // A vendor an admin listed claims their page: the admin checked their
+  // email with them when setting it up
+  if (user.onboardedBy && !user.claimedAt) {
+    user.claimedAt = new Date();
+    user.emailVerified = true;
+  }
   user.passwordResetToken = undefined;
   user.passwordResetExpires = undefined;
   user.refreshTokens = [];

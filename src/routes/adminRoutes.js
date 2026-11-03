@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { protect, restrictTo } = require('../middlewares/auth');
-const { paramValidations, validate } = require('../middlewares/validation');
+const { paramValidations, adminValidations, validate } = require('../middlewares/validation');
 
 router.use(protect, restrictTo('admin'));
 
@@ -12,7 +12,11 @@ router.get('/payouts', adminController.getPayouts);
 router.post('/payouts/:id/mark-paid', paramValidations.mongoId, validate, adminController.markPayoutPaid);
 router.get('/disputes', adminController.getDisputes);
 router.get('/vendors', adminController.getVendors);
+router.post('/vendors', adminValidations.createVendor, validate, adminController.createVendor);
 router.post('/vendors/:id/founding', paramValidations.mongoId, validate, adminController.setFoundingVendor);
+router.post('/vendors/:id/claim-link', paramValidations.mongoId, validate, adminController.newClaimLink);
+router.get('/requests', adminController.getRequests);
+router.post('/requests/:id/nudged', paramValidations.mongoId, validate, adminController.markNudged);
 router.post('/disputes/:id/resolve', paramValidations.mongoId, validate, adminController.resolveDispute);
 router.get('/services/unverified', adminController.getUnverifiedServices);
 router.get('/reviews/flagged', adminController.getFlaggedReviews);

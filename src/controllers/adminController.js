@@ -12,6 +12,8 @@ const ApiResponse = require('../utils/apiResponse');
 
 const disputeService = require('../services/disputeService');
 const payoutService = require('../services/payoutService');
+const vendorOnboarding = require('../services/vendorOnboardingService');
+const { filterObject } = require('../utils/helpers');
 
 const round2 = (n) => Math.round((n || 0) * 100) / 100;
 
@@ -269,7 +271,7 @@ exports.getVendors = catchAsync(async (req, res, next) => {
     { $group: { _id: '$provider', services: { $sum: 1 }, names: { $push: '$serviceName' }, verified: { $max: '$isVerified' }, firstListed: { $min: '$createdAt' } } }
   ]);
   const users = await User.find({ _id: { $in: listings.map(l => l._id) } })
-    .select('name email phone city foundingVendor foundingVendorAt noShowCount')
+    .select('name email phone city foundingVendor foundingVendorAt noShowCount onboardedBy claimedAt')
     .lean();
   const byId = Object.fromEntries(listings.map(l => [l._id.toString(), l]));
   const vendors = users
@@ -322,4 +324,71 @@ exports.setFoundingVendor = catchAsync(async (req, res, next) => {
   }
 
   res.json(ApiResponse.success({ _id: user._id, foundingVendor: user.foundingVendor }, founding ? 'Founding terms granted' : 'Founding terms removed'));
+});
+
+const ONBOARDING_SERVICE_FIELDS = [
+  'serviceName', 'category', 'description', 'basePrice', 'priceUnit', 'serviceAreas',
+  'portfolioImages', 'coverImage', 'dailyCapacity', 'tags', 'businessName', 'gstNumber'
+];
+
+// @desc    List a vendor from their intake form; returns the link to send them
+// @route   POST /api/v1/admin/vendors   { name, email, phone, city, service }
+// @access  Admin
+exports.createVendor = catchAsync(async (req, res, next) => {
+  const { user, service, claimUrl } = await vendorOnboarding.createVendor({
+    ...filterObject(req.body, ['name', 'email', 'phone', 'city']),
+    service: filterObject(req.body.service || {}, ONBOARDING_SERVICE_FIELDS)
+  }, req.user);
+
+  res.status(201).json(ApiResponse.success({
+    vendor: { _id: user._id, name: user.name, phone: user.phone },
+    service: { _id: service._id, slug: service.slug, serviceName: service.serviceName },
+    claimUrl
+  }, 'Vendor listed'));
+});
+
+// @desc    A fresh link for a vendor to set their password (the old one stops working)
+// @route   POST /api/v1/admin/vendors/:id/claim-link
+// @access  Admin
+exports.newClaimLink = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.params.id);
+  if (!user || !user.onboardedBy) {
+    return next(new ApiError('Only vendors you listed have a claim link', 404));
+  }
+  if (user.claimedAt) {
+    return next(new ApiError('This vendor already set their password. They can use "Forgot password" if needed.', 400));
+  }
+  res.json(ApiResponse.success({ claimUrl: await vendorOnboarding.claimLink(user) }, 'New link created'));
+});
+
+// @desc    Booking requests vendors haven't answered yet, oldest first, so an
+//          admin can chase vendors who don't read email
+// @route   GET /api/v1/admin/requests
+// @access  Admin
+exports.getRequests = catchAsync(async (req, res, next) => {
+  const requests = await Booking.find({ status: 'pending' })
+    .sort('createdAt')
+    .limit(100)
+    .populate('service', 'serviceName slug')
+    .populate('vendor', 'name phone')
+    .populate('organizer', 'name')
+    .populate('event', 'title')
+    .select('service vendor organizer event eventDate priceAgreed createdAt vendorNudgedAt')
+    .lean();
+  res.json(ApiResponse.success(requests, 'Requests retrieved'));
+});
+
+// @desc    Record that the vendor was messaged about a request
+// @route   POST /api/v1/admin/requests/:id/nudged
+// @access  Admin
+exports.markNudged = catchAsync(async (req, res, next) => {
+  const booking = await Booking.findOneAndUpdate(
+    { _id: req.params.id, status: 'pending' },
+    { vendorNudgedAt: new Date() },
+    { new: true }
+  ).select('vendorNudgedAt');
+  if (!booking) {
+    return next(new ApiError('This request was already answered', 404));
+  }
+  res.json(ApiResponse.success(booking, 'Marked as messaged'));
 });

@@ -193,7 +193,10 @@ const bookingSchema = new mongoose.Schema({
   },
 
   // Completion
-  completedAt: Date
+  completedAt: Date,
+
+  // When an admin last messaged the vendor about this request (WhatsApp)
+  vendorNudgedAt: Date
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
