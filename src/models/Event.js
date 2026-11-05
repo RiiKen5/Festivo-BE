@@ -103,6 +103,17 @@ const eventSchema = new mongoose.Schema({
     default: 'INR'
   },
 
+  // The organizer lets vendors find this event and send offers. Vendors see
+  // only the type, date, city, guest count and what's needed.
+  vendorOffers: {
+    open: { type: Boolean, default: false },
+    needs: [{
+      type: String,
+      enum: ['food', 'decor', 'photography', 'music', 'cleanup', 'entertainment', 'venue', 'other']
+    }],
+    note: { type: String, trim: true, maxlength: [300, 'Keep the note under 300 characters'] }
+  },
+
   // Visibility
   isPublic: {
     type: Boolean,
@@ -200,6 +211,7 @@ const eventSchema = new mongoose.Schema({
 eventSchema.index({ organizer: 1 });
 eventSchema.index({ date: 1 });
 eventSchema.index({ isPublic: 1, status: 1 });
+eventSchema.index({ 'vendorOffers.open': 1, city: 1, date: 1 });
 eventSchema.index({ city: 1 });
 eventSchema.index({ location: '2dsphere' }, { sparse: true });
 eventSchema.index({ tags: 1 });

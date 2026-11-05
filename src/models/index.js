@@ -9,6 +9,7 @@ const Review = require('./Review');
 const Notification = require('./Notification');
 const Payment = require('./Payment');
 const Image = require('./Image');
+const Offer = require('./Offer');
 
 module.exports = {
   User,
@@ -21,5 +22,6 @@ module.exports = {
   Review,
   Notification,
   Payment,
-  Image
+  Image,
+  Offer
 };

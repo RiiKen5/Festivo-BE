@@ -15,6 +15,7 @@ const notificationRoutes = require('./notificationRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const adminRoutes = require('./adminRoutes');
 const uploadRoutes = require('./uploadRoutes');
+const offerRoutes = require('./offerRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -30,6 +31,7 @@ router.use('/notifications', notificationRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
 router.use('/uploads', uploadRoutes);
+router.use('/offers', offerRoutes);
 
 // Health check
 router.get('/health', (req, res) => {

@@ -104,7 +104,8 @@ notificationSchema.pre('save', function(next) {
 const EMAILED_TITLES = new Set([
   'New Booking Request', 'Booking Confirmed', 'Booking Cancelled', 'Payment Received',
   'Advance on its way', 'Advance Sent', 'Payout Sent', 'Service Verified',
-  'Problem Reported', 'Vendor Replied', 'Problem Resolved', 'Event Cancelled', "You're a founding vendor"
+  'Problem Reported', 'Vendor Replied', 'Problem Resolved', 'Event Cancelled', "You're a founding vendor",
+  'New Offer', 'Offer Accepted'
 ]);
 
 // Sent in the background: a slow or failing mail server never holds up the request
