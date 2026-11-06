@@ -29,6 +29,7 @@ const startServer = async () => {
 
     // Background jobs
     require('./src/jobs/autoComplete').start();
+    require('./src/jobs/searchPages').start();
 
     // Start server
     server.listen(PORT, () => {

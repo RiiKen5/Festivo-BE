@@ -16,6 +16,7 @@ const paymentRoutes = require('./paymentRoutes');
 const adminRoutes = require('./adminRoutes');
 const uploadRoutes = require('./uploadRoutes');
 const offerRoutes = require('./offerRoutes');
+const seoRoutes = require('./seoRoutes');
 
 // Mount routes
 router.use('/auth', authRoutes);
@@ -32,6 +33,7 @@ router.use('/payments', paymentRoutes);
 router.use('/admin', adminRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/offers', offerRoutes);
+router.use('/seo', seoRoutes);
 
 // Health check
 router.get('/health', (req, res) => {

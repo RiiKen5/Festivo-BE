@@ -24,4 +24,11 @@ cd backend/e2e && npm test           # terminal 3: seeds and runs every journey
 `crawl.js` visits every page as each role; `mobile.js` checks for horizontal
 overflow at phone width; `a11y.js` runs axe-core (WCAG 2 A/AA) on 17 pages.
 Run them with `npm run crawl`, `npm run mobile`, `npm run a11y`.
+
+`journey-seo.js` (`npm run seo`) needs a production build first
+(`cd ../../frontend && npm run build`). It pre-renders the vendor and event
+pages from the local API, reads them like a crawler without JavaScript
+(titles, canonical URLs, structured data, sitemap, robots.txt, private events
+left out), then checks the tags the app sets in the browser and that no
+internal link on a public page is broken.
 Screenshots land in `shots/`.

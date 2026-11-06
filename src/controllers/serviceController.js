@@ -90,9 +90,10 @@ exports.getService = catchAsync(async (req, res, next) => {
     return next(new ApiError('Service not found', 404));
   }
 
-  // Increment views
+  // Count the view without touching updatedAt, which the sitemap uses as
+  // the date the listing last changed
+  await Service.updateOne({ _id: service._id }, { $inc: { views: 1 } }, { timestamps: false });
   service.views += 1;
-  await service.save();
 
   res.json(ApiResponse.success(service, 'Service retrieved successfully'));
 });
@@ -108,9 +109,10 @@ exports.getServiceBySlug = catchAsync(async (req, res, next) => {
     return next(new ApiError('Service not found', 404));
   }
 
-  // Increment views
+  // Count the view without touching updatedAt, which the sitemap uses as
+  // the date the listing last changed
+  await Service.updateOne({ _id: service._id }, { $inc: { views: 1 } }, { timestamps: false });
   service.views += 1;
-  await service.save();
 
   res.json(ApiResponse.success(service, 'Service retrieved successfully'));
 });

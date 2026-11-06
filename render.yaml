@@ -50,3 +50,11 @@ services:
         value: 15
       - key: TICKET_FEE_PERCENT
         value: 5
+      # Search: rebuild the frontend when listings change (Render > festivo-frontend
+      # > Settings > Deploy Hook) and ping IndexNow once the new pages are live
+      - key: SITE_URL
+        value: https://festivo.paathly.in
+      - key: FRONTEND_DEPLOY_HOOK_URL
+        sync: false
+      - key: INDEXNOW_KEY
+        sync: false

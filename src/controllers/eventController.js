@@ -102,7 +102,7 @@ const sendEventIfAccessible = async (event, req, res, next) => {
     return next(new ApiError('Event not found', 404));
   }
 
-  await Event.updateOne({ _id: event._id }, { $inc: { views: 1 } });
+  await Event.updateOne({ _id: event._id }, { $inc: { views: 1 } }, { timestamps: false });
 
   res.json(ApiResponse.success(serializeEvent(event, req.user), 'Event retrieved successfully'));
 };

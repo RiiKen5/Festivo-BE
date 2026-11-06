@@ -10,6 +10,7 @@ const Notification = require('./Notification');
 const Payment = require('./Payment');
 const Image = require('./Image');
 const Offer = require('./Offer');
+const SiteState = require('./SiteState');
 
 module.exports = {
   User,
@@ -23,5 +24,6 @@ module.exports = {
   Notification,
   Payment,
   Image,
-  Offer
+  Offer,
+  SiteState
 };

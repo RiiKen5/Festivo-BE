@@ -8,7 +8,8 @@
     "test": "for j in journey-booking journey-events journey-account journey-secondary journey-growth journey-chat journey-planner journey-voice journey-card journey-availability journey-guest-rsvp journey-dispute journey-founding journey-onboarding journey-offers journey-delete-account; do node seed.js && node $j.js || exit 1; done",
     "a11y": "node seed.js && node a11y.js",
     "crawl": "node seed.js && node crawl.js",
-    "mobile": "node seed.js && node mobile.js"
+    "mobile": "node seed.js && node mobile.js",
+    "seo": "node seed.js && node journey-seo.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
