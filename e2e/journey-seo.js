@@ -14,11 +14,12 @@ const DIST = path.join(FRONTEND, 'dist/frontend/browser');
 const SITE = 'https://festivo.paathly.in';
 const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (!ok) process.exitCode = 1; };
 
-// Render's static hosting: an existing file wins over the "/* -> /index.html" rewrite
+// Render's static hosting: an existing file wins over the "/* -> /index.html"
+// rewrite, and a folder's index.html is served only at "/folder/"
 const TYPES = { '.html': 'text/html', '.xml': 'application/xml', '.txt': 'text/plain', '.js': 'text/javascript', '.css': 'text/css' };
 const serve = () => http.createServer((req, res) => {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  const candidates = [path.join(DIST, url), path.join(DIST, url, 'index.html')];
+  const candidates = url.endsWith('/') ? [path.join(DIST, url, 'index.html')] : [path.join(DIST, url)];
   const file = candidates.find(f => f.startsWith(DIST) && fs.existsSync(f) && fs.statSync(f).isFile()) || path.join(DIST, 'index.html');
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
@@ -48,25 +49,25 @@ const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json" dat
   const server = serve();
 
   // 1. What crawlers and link previews see without JavaScript
-  const vendorHtml = await get(`/services/${vendor.slug}`);
+  const vendorHtml = await get(`/services/${vendor.slug}/`);
   check(tag(vendorHtml, /<title>([^<]*)</) === `${vendor.serviceName} · Food &amp; cakes in ${vendor.city} · Festivo`, 'vendor page has its own title');
-  check(tag(vendorHtml, /rel="canonical" href="([^"]*)"/) === `${SITE}/services/${vendor.slug}`, 'vendor page canonical URL');
+  check(tag(vendorHtml, /rel="canonical" href="([^"]*)"/) === `${SITE}/services/${vendor.slug}/`, 'vendor page canonical URL (trailing slash, the form Render serves)');
   check(/^https:\/\//.test(tag(vendorHtml, /og:image" content="([^"]*)"/) || ''), 'vendor preview image is an absolute URL');
   const service = ld(vendorHtml)[0]['@graph'];
   check(service[0]['@type'] === 'Service' && service[0].offers.priceSpecification.price === vendor.basePrice && service[0].offers.priceSpecification.priceCurrency === 'INR', 'vendor structured data: Service with the real price');
   check(service[1]['@type'] === 'BreadcrumbList' && service[1].itemListElement.length === 3, 'vendor breadcrumbs');
   check(/<script src="main-[^"]+\.js"/.test(vendorHtml), 'vendor page still boots the app');
 
-  const eventHtml = await get(`/events/${publicEvent.slug}`);
+  const eventHtml = await get(`/events/${publicEvent.slug}/`);
   const ev = ld(eventHtml)[0]['@graph'][0];
   check(ev['@type'] === 'Event' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:00\+05:30$/.test(ev.startDate) && ev.offers.price === 499 && ev.location.address.addressLocality, `public event structured data (${ev.startDate}, ₹${ev.offers.price})`);
 
-  const privateHtml = await get(`/events/${privateEvent.slug}`);
+  const privateHtml = await get(`/events/${privateEvent.slug}/`);
   check(!privateHtml.includes(privateEvent.title) && !/rel="canonical"/.test(privateHtml) && ld(privateHtml).length === 0, 'private event: no page of its own, nothing about it in the HTML');
 
   const sitemap = await get('/sitemap.xml');
-  check(sitemap.includes(`${SITE}/services/${vendor.slug}</loc><lastmod>`), 'sitemap lists the vendor with its last change');
-  check(sitemap.includes(`${SITE}/events/${publicEvent.slug}<`) && !sitemap.includes(privateEvent.slug), 'sitemap has the public event, not the private one');
+  check(sitemap.includes(`${SITE}/services/${vendor.slug}/</loc><lastmod>`), 'sitemap lists the vendor with its last change');
+  check(sitemap.includes(`${SITE}/events/${publicEvent.slug}/<`) && !sitemap.includes(privateEvent.slug), 'sitemap has the public event, not the private one');
   check(!/\/(auth|dashboard|admin|delete-account)/.test(sitemap), 'sitemap leaves out private and account pages');
   const robots = await get('/robots.txt');
   check(robots.includes(`Sitemap: ${SITE}/sitemap.xml`) && robots.includes('Disallow: /dashboard'), 'robots.txt');
@@ -84,11 +85,13 @@ const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json" dat
 
   await page.goto(`${APP}/services/${vendor.slug}`); await settle(page);
   let h = await head();
-  check(h.title.startsWith(vendor.serviceName) && h.canonical === `${SITE}/services/${vendor.slug}` && h.robots.startsWith('index'), 'vendor page in the browser: title, canonical, indexable');
+  check(h.title.startsWith(vendor.serviceName) && h.canonical === `${SITE}/services/${vendor.slug}/` && h.robots.startsWith('index'), 'vendor page in the browser: title, canonical, indexable');
+  await page.goto(`${APP}/services/${vendor.slug}/`); await settle(page);
+  check(await page.getByRole('heading', { level: 1, name: vendor.serviceName }).isVisible(), 'the slash form of a vendor URL opens the vendor page');
 
   await page.goto(`${APP}/services?category=food&q=cake`); await settle(page);
   h = await head();
-  check(h.canonical === `${SITE}/services` && h.title.startsWith('Event vendors near you'), 'filtered vendor list points to the main list');
+  check(h.canonical === `${SITE}/services/` && h.title.startsWith('Event vendors near you'), 'filtered vendor list points to the main list');
 
   await page.goto(`${APP}/no-such-page`); await settle(page);
   h = await head();
