@@ -97,6 +97,24 @@ describe('rebuilding pages and telling search engines', () => {
     expect(axios.post).toHaveBeenCalledTimes(2);
   });
 
+  it('rebuilds when a listing is deleted, and tells search engines it is gone', async () => {
+    process.env.FRONTEND_DEPLOY_HOOK_URL = 'https://api.render.com/deploy/srv-x?key=y';
+    process.env.INDEXNOW_KEY = 'abc123abc123';
+    axios.post.mockResolvedValue({ status: 200 });
+    const { user } = await createUser();
+    const service = await createService(user, { serviceName: 'Demo Cakes' });
+    const t0 = new Date(Date.now() + 60 * 1000);
+    await seoService.refreshSearchPages(t0);
+
+    await Service.deleteOne({ _id: service._id });
+    const later = new Date(t0.getTime() + seoService.MIN_REBUILD_GAP);
+    expect(await seoService.refreshSearchPages(later)).toEqual({ rebuilt: true, notified: 0 });
+
+    const live = new Date(later.getTime() + seoService.BUILD_TIME);
+    expect(await seoService.refreshSearchPages(live)).toEqual({ rebuilt: false, notified: 1 });
+    expect(axios.post.mock.calls[1][1].urlList).toEqual([`https://yaay.paathly.in/services/${service.slug}`]);
+  });
+
   it('keeps the URLs for next time if IndexNow fails', async () => {
     process.env.FRONTEND_DEPLOY_HOOK_URL = 'https://api.render.com/deploy/srv-x?key=y';
     process.env.INDEXNOW_KEY = 'abc123abc123';

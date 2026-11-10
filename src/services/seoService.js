@@ -92,6 +92,19 @@ const changedPaths = async (since) => {
   ];
 };
 
+// The pages in the sitemap right now: a listing deleted, paused or past its
+// date drops out of this list without anything being "updated"
+const publicPaths = async (now) => {
+  const [services, events] = await Promise.all([
+    Service.find({ isActive: true }).select('slug').limit(LIMIT).lean(),
+    Event.find(publicEventQuery(now)).select('slug').limit(LIMIT).lean()
+  ]);
+  return [
+    ...services.map(s => `/services/${s.slug}`),
+    ...events.map(e => `/events/${e.slug}`)
+  ];
+};
+
 // IndexNow (Bing, Yandex, Seznam, Naver): one POST for up to 10,000 URLs.
 // The key is public by design; it must also be served at /<key>.txt.
 const notifyIndexNow = async (paths) => {
@@ -108,7 +121,7 @@ const notifyIndexNow = async (paths) => {
 };
 
 /**
- * Hourly: when listings changed, rebuild the frontend (Render deploy hook) so
+ * Hourly: when listings changed (added, edited, removed or past their date), rebuild the frontend (Render deploy hook) so
  * the new pages are crawlable and in the sitemap; once that build has had
  * time to go live, ping IndexNow with the changed URLs.
  */
@@ -119,11 +132,11 @@ const refreshSearchPages = async (now = new Date()) => {
   let state = await SiteState.findOne({ key: STATE_KEY });
   if (!state) {
     // First run: start counting changes from now rather than rebuilding for history
-    await SiteState.create({ key: STATE_KEY, value: { lastBuildAt: now, pending: [] } });
+    await SiteState.create({ key: STATE_KEY, value: { lastBuildAt: now, pending: [], paths: await publicPaths(now) } });
     return { rebuilt: false, notified: 0 };
   }
-  const { lastBuildAt, pending = [] } = state.value;
-  const value = { lastBuildAt: new Date(lastBuildAt), pending };
+  const { lastBuildAt, pending = [], paths } = state.value;
+  const value = { lastBuildAt: new Date(lastBuildAt), pending, paths };
   let notified = 0;
 
   if (pending.length && now - value.lastBuildAt >= BUILD_TIME) {
@@ -139,10 +152,15 @@ const refreshSearchPages = async (now = new Date()) => {
   let rebuilt = false;
   if (now - value.lastBuildAt >= MIN_REBUILD_GAP) {
     const changed = await changedPaths(value.lastBuildAt);
-    if (changed.length) {
+    const current = await publicPaths(now);
+    // Saved before pages were tracked: rebuild once to be sure
+    const removed = paths ? paths.filter(p => !current.includes(p)) : current;
+    if (changed.length || removed.length) {
       await axios.post(hook, null, { timeout: 15000 });
       value.lastBuildAt = now;
-      value.pending = [...new Set([...value.pending, ...changed])];
+      value.paths = current;
+      // Removed pages too, so search engines recheck them and drop them
+      value.pending = [...new Set([...value.pending, ...changed, ...removed])];
       rebuilt = true;
     }
   }
