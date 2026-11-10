@@ -9,6 +9,7 @@
     "a11y": "node seed.js && node a11y.js",
     "crawl": "node seed.js && node crawl.js",
     "mobile": "node seed.js && node mobile.js",
+    "mobile-scroll": "node seed.js && node mobile-scroll.js",
     "seo": "node seed.js && node journey-seo.js"
   },
   "devDependencies": {
