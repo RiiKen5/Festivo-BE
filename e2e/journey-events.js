@@ -14,19 +14,23 @@ const inDays = (n) => new Date(Date.now() + n * 864e5).toISOString().split('T')[
     // 1. Create a private event through the form
     await org.page.goto(`${APP}/events/create`); await settle(org.page);
     const f = (name) => org.page.locator(`app-input[formcontrolname=${name}] input`);
+    // A step at a time: occasion, when and where, guests, extras
+    const next = () => org.page.locator('button[type=submit]').click();
+    await org.page.locator('.type-option', { hasText: 'Farewell' }).click();
     await f('title').fill('Asha Farewell Dinner');
-    await org.page.locator('.type-option').nth(5).click();
-    await org.page.locator('textarea[formcontrolname=description]').fill('A farewell dinner for Asha before she moves to Bangalore.');
+    await next();
     await f('date').fill(inDays(15));
     await f('time').fill('20:00');
     await f('locationName').fill('The Flour Works');
     await pickCity(org.page, 'Pune');
     await f('address').fill('Kalyani Nagar, Pune');
+    await next();
     await f('expectedGuests').fill('12');
-    const isPublic = org.page.locator('input[formcontrolname=isPublic]');
-    if (await isPublic.isChecked()) await isPublic.locator('xpath=..').click();
+    await org.page.getByRole('button', { name: /Invite only/ }).click();
+    await next();
+    await org.page.locator('textarea[formcontrolname=description]').fill('A farewell dinner for Asha before she moves to Bangalore.');
     await step(org.page, '1_create_form');
-    await org.page.locator('button[type=submit]').click();
+    await next();
     await org.page.waitForURL(/\/events\/asha-farewell/, { timeout: 8000 });
     await step(org.page, '1_created');
 

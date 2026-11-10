@@ -21,16 +21,25 @@ const inDays = (d) => new Date(Date.now() + d * 864e5).toISOString().slice(0, 10
   // Create a birthday in Pune
   await page.goto(APP + '/events/create'); await settle(page);
   const f = (n) => page.locator(`app-input[formcontrolname=${n}] input`);
+  const next = () => page.locator('button[type=submit]').click();
+  // Step 1 must be filled before moving on
+  await next();
+  check(await page.getByText('This field is required').isVisible(), 'continue without a name shows what is missing');
+  await page.locator('.type-option', { hasText: 'Birthday' }).click();
   await f('title').fill('Riya turns 5');
-  await page.locator('.type-option').first().click();
-  await page.locator('textarea[formcontrolname=description]').fill('Small birthday party at home with family and friends.');
+  check(await page.locator('.invite__title').innerText() === 'Riya turns 5', 'preview shows the name as you type');
+  await next();
   await f('date').fill(inDays(25));
   await f('time').fill('17:00');
   await f('locationName').fill('Home');
   await pickCity(page, 'Pun');
   await f('address').fill('Baner, Pune');
-  await f('expectedGuests').fill('25');
-  await page.locator('button[type=submit]').click();
+  await next();
+  await page.locator('.quick__btn', { hasText: '25' }).click();
+  check(await f('expectedGuests').inputValue() === '25', 'guest quick pick fills the count');
+  await next();
+  // Last step is optional: create straight away, a description is written for you
+  await next();
   await page.waitForURL(/\/events\/riya-turns-5.*new=1/, { timeout: 10000 });
   await settle(page, 1200);
 
