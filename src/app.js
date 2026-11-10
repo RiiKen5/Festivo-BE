@@ -84,7 +84,7 @@ app.use('/api/v1', routes);
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    message: 'Welcome to Festivo API',
+    message: 'Welcome to Yaay API',
     version: '1.0.0',
     documentation: '/api/v1/docs'
   });

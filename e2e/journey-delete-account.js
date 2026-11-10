@@ -33,7 +33,7 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
 
   // The public page Google Play links to
   await guest.page.goto(`${APP}/delete-account`); await settle(guest.page);
-  check(await guest.page.getByRole('heading', { name: 'Delete your Festivo account' }).isVisible(), 'public deletion page loads');
+  check(await guest.page.getByRole('heading', { name: 'Delete your Yaay account' }).isVisible(), 'public deletion page loads');
 
   await browser.close();
   const issues = [...host.issues, ...guest.issues].filter(x => !/-> 401/.test(x));

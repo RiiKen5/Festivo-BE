@@ -66,14 +66,14 @@ describe('fee by source and founding terms', () => {
     const found = await createUser();
 
     expect((await book({ organizer: own, service, viaVendorLink: true })).feePercent).toBe(3);
-    const fromFestivo = await book({ organizer: found, service });
-    expect(fromFestivo).toMatchObject({ source: 'marketplace', feePercent: 10 });
+    const fromYaay = await book({ organizer: found, service });
+    expect(fromYaay).toMatchObject({ source: 'marketplace', feePercent: 10 });
 
-    // Later sent the vendor's link: still a customer Festivo brought
+    // Later sent the vendor's link: still a customer Yaay brought
     expect((await book({ organizer: found, service, viaVendorLink: true })).source).toBe('marketplace');
 
-    await confirmAndPay({ organizer: found, vendor, bookingId: fromFestivo._id });
-    const payment = await Payment.findOne({ booking: fromFestivo._id });
+    await confirmAndPay({ organizer: found, vendor, bookingId: fromYaay._id });
+    const payment = await Payment.findOne({ booking: fromYaay._id });
     expect(payment.platformFee).toBe(1000);
   });
 
@@ -151,7 +151,7 @@ describe('early release and the payout promise', () => {
     expect(earnings).toEqual({ held: 0, payoutDue: 0, paidOut: 9000 });
   });
 
-  it('a late payout carries no Festivo fee', async () => {
+  it('a late payout carries no Yaay fee', async () => {
     const { admin, bookingId, organizer } = await setup({ verified: false });
     expect((await payouts(admin)).body.data).toHaveLength(0); // unverified: no early release
     await request(app).post(`/api/v1/bookings/${bookingId}/complete`).set(auth(organizer.token)).expect(200);
@@ -171,7 +171,7 @@ describe('early release and the payout promise', () => {
     await send(admin, advance._id, 'advance').expect(200);
 
     // The vendor cancels: the organizer gets everything back, and the ₹4,500
-    // already sent is owed to Festivo
+    // already sent is owed to Yaay
     await request(app).post(`/api/v1/bookings/${bookingId}/cancel`).set(auth(vendor.token)).expect(200);
     expect(refunds).toEqual([10000]);
     expect((await User.findById(vendor.user._id)).penaltyDue).toBe(4500);

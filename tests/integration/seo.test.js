@@ -85,10 +85,10 @@ describe('rebuilding pages and telling search engines', () => {
     const [url, body] = axios.post.mock.calls[1];
     expect(url).toBe('https://api.indexnow.org/indexnow');
     expect(body).toEqual({
-      host: 'festivo.paathly.in',
+      host: 'yaay.paathly.in',
       key: 'abc123abc123',
-      keyLocation: 'https://festivo.paathly.in/abc123abc123.txt',
-      urlList: [`https://festivo.paathly.in/services/${service.slug}`]
+      keyLocation: 'https://yaay.paathly.in/abc123abc123.txt',
+      urlList: [`https://yaay.paathly.in/services/${service.slug}`]
     });
 
     // Nothing new: no more builds or pings

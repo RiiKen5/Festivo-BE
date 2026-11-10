@@ -118,7 +118,7 @@ exports.respond = async (booking, vendor, { response, evidence }) => {
   await booking.save();
 
   await notify(booking.organizer, booking, 'Vendor Replied',
-    'The vendor replied to the problem you reported. Festivo will review both sides and let you know.');
+    'The vendor replied to the problem you reported. Yaay will review both sides and let you know.');
   await chatService.postBookingUpdate(booking, vendor._id, `Replied to the reported problem: ${text}`);
   return booking;
 };

@@ -1,6 +1,6 @@
 // Founding Vendor Plan: a vendor lists and becomes a founding vendor; a
 // customer who comes through the vendor's shared link books at 0%, one who
-// found a vendor on Festivo books at the standard 10%, and the vendor sees
+// found a vendor on Yaay books at the standard 10%, and the vendor sees
 // which fee applies.
 const { chromium, APP, session, login, settle, api, tokenFor } = require('./lib');
 
@@ -46,18 +46,18 @@ const requestBooking = async (page, price) => {
   await flash.page.goto(`${APP}/bookings/${own._id}`); await settle(flash.page);
   check(await flash.page.getByText('0% fee (your own customer, founding rate').isVisible(), 'vendor sees the own-customer founding fee');
 
-  // Found on Festivo: the cake vendor (not founding) at 10%
+  // Found on Yaay: the cake vendor (not founding) at 10%
   const cake = (await api('/services')).data.find(s => s.serviceName.startsWith('Priya'));
   await org.page.goto(`${APP}/services/${cake.slug}`); await settle(org.page);
   await requestBooking(org.page, 2000);
   const found = (await api('/bookings?role=organizer', { token: orgToken })).data.find(b => b.service.serviceName.startsWith('Priya'));
-  check(found && found.source === 'marketplace' && found.feePercent === 10, `booking found on Festivo: 10% (${found && found.feePercent}%)`);
+  check(found && found.source === 'marketplace' && found.feePercent === 10, `booking found on Yaay: 10% (${found && found.feePercent}%)`);
 
   const priya = await session(browser, 'priya'); issues.push(priya.issues);
   await login(priya.page, 'priya@test.in');
   await priya.page.goto(`${APP}/bookings/${found._id}`); await settle(priya.page);
   await priya.page.getByRole('button', { name: /Accept & send price/ }).first().click();
-  check(await priya.page.getByText('you receive ₹1,800 after Festivo\'s 10% fee (new customer from Festivo').isVisible(), 'quote shows what the vendor receives');
+  check(await priya.page.getByText('you receive ₹1,800 after Yaay\'s 10% fee (new customer from Yaay').isVisible(), 'quote shows what the vendor receives');
   await priya.page.screenshot({ path: 'shots/founding-quote.png', fullPage: false });
 
   // Admin sees vendors and can remove or grant founding terms

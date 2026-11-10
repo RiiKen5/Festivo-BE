@@ -1,7 +1,7 @@
 {
-  "name": "festivo-backend",
+  "name": "yaay-backend",
   "version": "1.0.0",
-  "description": "Festivo Event Marketplace Platform Backend",
+  "description": "Yaay Event Marketplace Platform Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

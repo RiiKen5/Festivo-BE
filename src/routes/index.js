@@ -47,7 +47,7 @@ router.get('/health', (req, res) => {
 
   res.json({
     success: true,
-    message: 'Festivo API is running',
+    message: 'Yaay API is running',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     email: require('../services/emailService').isConfigured() ? 'configured' : 'not configured',

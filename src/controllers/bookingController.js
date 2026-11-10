@@ -342,7 +342,7 @@ exports.cancelBooking = catchAsync(async (req, res, next) => {
   }
 
   if (booking.dispute && booking.dispute.status === 'open') {
-    return next(new ApiError('A reported problem is being reviewed. Festivo will settle it.', 400));
+    return next(new ApiError('A reported problem is being reviewed. Yaay will settle it.', 400));
   }
 
   const refunded = await bookingService.cancelBooking(booking, req.user, reason);
@@ -373,7 +373,7 @@ exports.completeBooking = catchAsync(async (req, res, next) => {
   }
 
   if (booking.dispute && booking.dispute.status === 'open') {
-    return next(new ApiError('A reported problem is being reviewed. Festivo will settle it.', 400));
+    return next(new ApiError('A reported problem is being reviewed. Yaay will settle it.', 400));
   }
 
   booking.status = 'completed';
@@ -586,5 +586,5 @@ exports.respondToDispute = catchAsync(async (req, res, next) => {
   const booking = await loadOwnBooking(req, next, 'vendor');
   if (!booking) return;
   await disputeService.respond(booking, req.user, req.body);
-  res.json(ApiResponse.success(booking, 'Reply sent. Festivo will review both sides.'));
+  res.json(ApiResponse.success(booking, 'Reply sent. Yaay will review both sides.'));
 });

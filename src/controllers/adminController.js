@@ -119,7 +119,7 @@ exports.markPayoutPaid = catchAsync(async (req, res, next) => {
     recipient: payment.payee,
     type: 'payment',
     title: part === 'advance' ? 'Advance Sent' : 'Payout Sent',
-    message: `${what ? what + ' ' : ''}₹${sent} has been sent to your account (ref ${reference})${deducted ? `, after ₹${deducted} owed to Festivo` : ''}${feeWaived ? '. It was late, so there is no Festivo fee on this payment.' : ''}`,
+    message: `${what ? what + ' ' : ''}₹${sent} has been sent to your account (ref ${reference})${deducted ? `, after ₹${deducted} owed to Yaay` : ''}${feeWaived ? '. It was late, so there is no Yaay fee on this payment.' : ''}`,
     relatedBooking: payment.booking,
     relatedEvent: payment.event,
     actionUrl: '/dashboard'
@@ -318,7 +318,7 @@ exports.setFoundingVendor = catchAsync(async (req, res, next) => {
       recipient: user._id,
       type: 'system',
       title: "You're a founding vendor",
-      message: 'You pay 0% on customers who book through your own Festivo link and 5% on new customers, until the founding offer ends. New bookings get these rates.',
+      message: 'You pay 0% on customers who book through your own Yaay link and 5% on new customers, until the founding offer ends. New bookings get these rates.',
       actionUrl: '/dashboard/my-services'
     });
   }

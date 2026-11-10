@@ -144,7 +144,7 @@ const eventSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  // Who pays Festivo's ticket fee: taken from the host's price, or added
+  // Who pays Yaay's ticket fee: taken from the host's price, or added
   // on top for the guest
   ticketFeePaidBy: {
     type: String,

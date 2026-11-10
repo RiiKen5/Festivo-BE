@@ -158,7 +158,7 @@ exports.mine = async (vendor) => Offer.find({ vendor: vendor._id })
 
 /**
  * Organizer accepts: a confirmed booking at the offered price. Fees follow
- * the usual rules; a vendor who found the event on Festivo is a new customer.
+ * the usual rules; a vendor who found the event on Yaay is a new customer.
  */
 exports.accept = async (offer, organizer) => {
   if (!offer.organizer.equals(organizer._id)) {

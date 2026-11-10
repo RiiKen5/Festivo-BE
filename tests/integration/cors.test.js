@@ -4,10 +4,10 @@ const { frontendUrl } = require('../../src/config/frontend');
 
 describe('CORS with several frontend sites', () => {
   const saved = process.env.FRONTEND_URL;
-  beforeAll(() => { process.env.FRONTEND_URL = 'https://festivo.paathly.in, https://festivo-frontend.onrender.com/'; });
+  beforeAll(() => { process.env.FRONTEND_URL = 'https://yaay.paathly.in, https://festivo-frontend.onrender.com/'; });
   afterAll(() => { process.env.FRONTEND_URL = saved; });
 
-  it.each(['https://festivo.paathly.in', 'https://festivo-frontend.onrender.com'])('allows %s', async (origin) => {
+  it.each(['https://yaay.paathly.in', 'https://festivo.paathly.in', 'https://festivo-frontend.onrender.com'])('allows %s', async (origin) => {
     const res = await request(app).options('/api/v1/auth/login')
       .set('Origin', origin).set('Access-Control-Request-Method', 'POST');
     expect(res.headers['access-control-allow-origin']).toBe(origin);
@@ -19,7 +19,7 @@ describe('CORS with several frontend sites', () => {
   });
 
   it('uses the first site for links', () => {
-    expect(frontendUrl()).toBe('https://festivo.paathly.in');
+    expect(frontendUrl()).toBe('https://yaay.paathly.in');
   });
 });
 

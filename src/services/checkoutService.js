@@ -46,7 +46,7 @@ exports.createBookingOrder = async (booking, amount) => {
   });
 
   // Fee locked on the booking; bookings made before fee terms existed are
-  // treated as customers Festivo brought. The cap covers the whole booking.
+  // treated as customers Yaay brought. The cap covers the whole booking.
   const feePercent = typeof booking.feePercent === 'number'
     ? booking.feePercent
     : policies.bookingFeePercent({ source: 'marketplace', founding: false });
@@ -157,7 +157,7 @@ const applyBookingPayment = async (payment) => {
     amount: payment.amount,
     paymentMethod: 'razorpay',
     transactionId: payment.razorpayPaymentId,
-    notes: 'Paid online through Festivo'
+    notes: 'Paid online through Yaay'
   });
   booking.paymentMethod = 'razorpay';
   booking.transactionId = payment.razorpayPaymentId;
@@ -168,13 +168,13 @@ const applyBookingPayment = async (payment) => {
     recipient: booking.vendor,
     type: 'payment',
     title: 'Payment Received',
-    message: `₹${payment.amount} was paid online for your booking. Festivo releases it to you after the booking is completed.`,
+    message: `₹${payment.amount} was paid online for your booking. Yaay releases it to you after the booking is completed.`,
     relatedBooking: booking._id,
     actionUrl: `/bookings/${booking._id}`
   });
 
   await require('./chatService').postBookingUpdate(booking, booking.organizer,
-    `Paid ₹${payment.amount} online. Festivo holds it until the job is done.`);
+    `Paid ₹${payment.amount} online. Yaay holds it until the job is done.`);
 
   // Paid within the early-release window: the advance is due straight away
   await require('./payoutService').releaseAdvances({ bookingId: booking._id });

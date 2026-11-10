@@ -10,9 +10,9 @@ const HOUR = 60 * 60 * 1000;
 
 module.exports = {
   /**
-   * Festivo's fee on a vendor booking (Founding Vendor Plan). Lower on the
+   * Yaay's fee on a vendor booking (Founding Vendor Plan). Lower on the
    * vendor's own customers (who came through the vendor's shared link) than
-   * on customers Festivo brought. Founding vendors pay less until the
+   * on customers Yaay brought. Founding vendors pay less until the
    * founding terms end.
    * @param {object} terms
    * @param {'vendor_link'|'marketplace'} terms.source
@@ -27,7 +27,7 @@ module.exports = {
     return own ? percentFromEnv('BOOKING_FEE_OWN_PERCENT', 3) : percentFromEnv('BOOKING_FEE_NEW_PERCENT', 10);
   },
 
-  // Most Festivo takes from one booking, in rupees
+  // Most Yaay takes from one booking, in rupees
   bookingFeeCap: () => {
     const value = parseFloat(process.env.BOOKING_FEE_CAP);
     return Number.isFinite(value) && value >= 0 ? value : 1000;

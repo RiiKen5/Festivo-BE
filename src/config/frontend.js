@@ -1,12 +1,12 @@
 // FRONTEND_URL may list several sites, comma separated, e.g.
-//   FRONTEND_URL=https://festivo.paathly.in,https://festivo-frontend.onrender.com
+//   FRONTEND_URL=https://yaay.paathly.in,https://festivo-frontend.onrender.com
 // All of them may call the API (CORS); the first is the main site used in
 // email and invite links.
 
 const DEFAULT = 'http://localhost:4200';
 
 // Production sites that may always call the API, whatever FRONTEND_URL says
-const KNOWN_SITES = ['https://festivo.paathly.in', 'https://festivo-frontend.onrender.com'];
+const KNOWN_SITES = ['https://yaay.paathly.in', 'https://festivo.paathly.in', 'https://festivo-frontend.onrender.com'];
 
 const list = () => (process.env.FRONTEND_URL || DEFAULT)
   .split(',')

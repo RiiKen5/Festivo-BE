@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-// Demo data for trying Festivo end to end: every role, every booking and
+// Demo data for trying Yaay end to end: every role, every booking and
 // payment state, events of every kind, reviews, messages, notifications.
 //
 //   node scripts/seed-demo.js            # (re)create demo data
@@ -55,7 +55,7 @@ async function seedDemo() {
     email: `${key}${DOMAIN}`, password: PASSWORD, name, city: 'Pune',
     emailVerified: true, phoneVerified: !!extra.phone, ...extra
   });
-  const admin = await person('admin', 'Festivo Admin', { role: 'admin', userType: 'all' });
+  const admin = await person('admin', 'Yaay Admin', { role: 'admin', userType: 'all' });
   const rohit = await person('organizer', 'Rohit Sharma', { userType: 'organizer', phone: '9000000001', bio: 'Planning my 30th and a few community meetups.' });
   const priya = await person('vendor', 'Priya Desai', {
     userType: 'helper', phone: '9000000002', bio: 'Home baker, custom theme cakes since 2019.',
@@ -160,7 +160,7 @@ async function seedDemo() {
     p.recalculateSplit();
     if (payoutStatus !== 'not_applicable') p.payoutStatus = payoutStatus;
     await p.save();
-    booking.payments.push({ amount, paymentMethod: 'razorpay', transactionId: p.razorpayPaymentId, notes: 'Paid online through Festivo', paidAt: p.paidAt });
+    booking.payments.push({ amount, paymentMethod: 'razorpay', transactionId: p.razorpayPaymentId, notes: 'Paid online through Yaay', paidAt: p.paidAt });
     return p;
   };
   const totals = (b) => {
@@ -247,7 +247,7 @@ async function seedDemo() {
   await note(priya, 'payment', 'Payout sent', '₹1,700 has been sent to your UPI (ref UTR4521987730)', '/dashboard/earnings');
   await note(priya, 'review', 'New review', 'Rohit Sharma left a 4-star review for your cakes', `/services/${cakes._id}`);
   await note(meera, 'booking', 'New booking request', 'Rohit Sharma wants balloon decor for a birthday. Send your quote.', '/bookings');
-  await note(arjun, 'payment', 'Advance received', '₹1,500 advance was paid online. Festivo holds it until the event is done.', '/bookings');
+  await note(arjun, 'payment', 'Advance received', '₹1,500 advance was paid online. Yaay holds it until the event is done.', '/bookings');
   await note(kabir, 'review', 'New 5-star review', 'Rohit Sharma left you a 5-star review', `/services/${dj._id}`);
   await note(asha, 'rsvp', 'Ticket confirmed', 'Your ticket for Sunset Rooftop Party is confirmed. Check-in code is on the event page.', `/events/${rooftop._id}`);
   await note(vikram, 'rsvp', 'Complete your ticket', 'Your ticket for Sunset Rooftop Party is reserved. Pay to confirm it.', `/events/${rooftop._id}`);

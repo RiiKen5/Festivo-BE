@@ -124,7 +124,7 @@ exports.duePayouts = async ({ limit = 100 } = {}) => {
 
 /**
  * Record that a payout was sent (UPI/bank transfer outside the app). Late
- * payouts waive Festivo's fee on that payment; penalties owed by the payee
+ * payouts waive Yaay's fee on that payment; penalties owed by the payee
  * are taken out of what is sent.
  * @returns {Promise<{payment: object, sent: number, deducted: number, feeWaived: boolean}|null>}
  */

@@ -38,7 +38,7 @@ services:
       - key: FROM_EMAIL
         sync: false
       - key: FROM_NAME
-        value: Festivo
+        value: Yaay
       # Online payments stay disabled until both keys are set
       - key: RAZORPAY_KEY_ID
         sync: false
@@ -53,7 +53,7 @@ services:
       # Search: rebuild the frontend when listings change (Render > festivo-frontend
       # > Settings > Deploy Hook) and ping IndexNow once the new pages are live
       - key: SITE_URL
-        value: https://festivo.paathly.in
+        value: https://yaay.paathly.in
       - key: FRONTEND_DEPLOY_HOOK_URL
         sync: false
       - key: INDEXNOW_KEY

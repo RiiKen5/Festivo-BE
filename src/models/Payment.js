@@ -45,10 +45,10 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  // Most Festivo may take from this payment (the booking's fee cap, less
+  // Most Yaay may take from this payment (the booking's fee cap, less
   // fees already taken on its other payments)
   feeCap: Number,
-  // Payout promise broken (sent late): no Festivo fee on this payment
+  // Payout promise broken (sent late): no Yaay fee on this payment
   feeWaived: {
     type: Boolean,
     default: false

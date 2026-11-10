@@ -14,7 +14,7 @@ const BUILD_TIME = 20 * 60 * 1000;
 const STATE_KEY = 'searchPages';
 const INDEXNOW_URL = 'https://api.indexnow.org/indexnow';
 
-const siteUrl = () => (process.env.SITE_URL || 'https://festivo.paathly.in').replace(/\/$/, '');
+const siteUrl = () => (process.env.SITE_URL || 'https://yaay.paathly.in').replace(/\/$/, '');
 
 // Public events stay listed until the day after they happen
 const publicEventQuery = (now) => ({

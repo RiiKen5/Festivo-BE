@@ -54,7 +54,7 @@ const paymentsOff = async (context) => context.route('**/api/v1/payments/config'
   const kavya = await session(browser, 'vendor'); issues.push(kavya.issues);
   await kavya.page.setViewportSize({ width: 390, height: 844 });
   await kavya.page.goto(claimUrl.replace(/^https?:\/\/[^/]+/, APP)); await settle(kavya.page);
-  check(await kavya.page.getByRole('heading', { name: 'Welcome to Festivo' }).isVisible(), 'vendor is welcomed, not told to "reset"');
+  check(await kavya.page.getByRole('heading', { name: 'Welcome to Yaay' }).isVisible(), 'vendor is welcomed, not told to "reset"');
   await kavya.page.locator('app-input[formcontrolname=password] input').fill('KavyaCakes123!');
   await kavya.page.locator('app-input[formcontrolname=confirmPassword] input').fill('KavyaCakes123!');
   await kavya.page.getByRole('button', { name: 'Set password' }).click();

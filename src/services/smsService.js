@@ -36,27 +36,27 @@ class SMSService {
   }
 
   async sendOTP(phoneNumber, otp) {
-    const message = `Your Festivo verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
+    const message = `Your Yaay verification code is: ${otp}. Valid for 10 minutes. Do not share this code.`;
     return this.sendSMS(phoneNumber, message);
   }
 
   async sendBookingConfirmation(phoneNumber, booking, event) {
-    const message = `Festivo: Your booking for "${event.title}" on ${new Date(booking.eventDate).toLocaleDateString()} has been confirmed. Amount: ₹${booking.priceAgreed}`;
+    const message = `Yaay: Your booking for "${event.title}" on ${new Date(booking.eventDate).toLocaleDateString()} has been confirmed. Amount: ₹${booking.priceAgreed}`;
     return this.sendSMS(phoneNumber, message);
   }
 
   async sendEventReminder(phoneNumber, event) {
-    const message = `Festivo Reminder: "${event.title}" is tomorrow at ${event.time}. Location: ${event.locationName}`;
+    const message = `Yaay Reminder: "${event.title}" is tomorrow at ${event.time}. Location: ${event.locationName}`;
     return this.sendSMS(phoneNumber, message);
   }
 
   async sendPaymentConfirmation(phoneNumber, amount, bookingId) {
-    const message = `Festivo: Payment of ₹${amount} received for booking #${bookingId.toString().slice(-6)}. Thank you!`;
+    const message = `Yaay: Payment of ₹${amount} received for booking #${bookingId.toString().slice(-6)}. Thank you!`;
     return this.sendSMS(phoneNumber, message);
   }
 
   async sendNewBookingAlert(phoneNumber, serviceName, organizerName) {
-    const message = `Festivo: New booking request for "${serviceName}" from ${organizerName}. Login to review.`;
+    const message = `Yaay: New booking request for "${serviceName}" from ${organizerName}. Login to review.`;
     return this.sendSMS(phoneNumber, message);
   }
 

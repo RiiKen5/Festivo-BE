@@ -11,7 +11,7 @@ const { chromium, APP, API, session, login, settle, api, tokenFor } = require('.
 
 const FRONTEND = path.join(__dirname, '../../frontend');
 const DIST = path.join(FRONTEND, 'dist/frontend/browser');
-const SITE = 'https://festivo.paathly.in';
+const SITE = 'https://yaay.paathly.in';
 const check = (ok, msg) => { console.log(`${ok ? 'PASS' : 'FAIL'} ${msg}`); if (!ok) process.exitCode = 1; };
 
 // Render's static hosting: an existing file wins over the "/* -> /index.html"
@@ -50,7 +50,7 @@ const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json" dat
 
   // 1. What crawlers and link previews see without JavaScript
   const vendorHtml = await get(`/services/${vendor.slug}/`);
-  check(tag(vendorHtml, /<title>([^<]*)</) === `${vendor.serviceName} · Food &amp; cakes in ${vendor.city} · Festivo`, 'vendor page has its own title');
+  check(tag(vendorHtml, /<title>([^<]*)</) === `${vendor.serviceName} · Food &amp; cakes in ${vendor.city} · Yaay`, 'vendor page has its own title');
   check(tag(vendorHtml, /rel="canonical" href="([^"]*)"/) === `${SITE}/services/${vendor.slug}/`, 'vendor page canonical URL (trailing slash, the form Render serves)');
   check(/^https:\/\//.test(tag(vendorHtml, /og:image" content="([^"]*)"/) || ''), 'vendor preview image is an absolute URL');
   const service = ld(vendorHtml)[0]['@graph'];
@@ -95,7 +95,7 @@ const ld = (html) => [...html.matchAll(/<script type="application\/ld\+json" dat
 
   await page.goto(`${APP}/no-such-page`); await settle(page);
   h = await head();
-  check(h.title === 'Page not found · Festivo' && h.robots === 'noindex' && !h.canonical, 'unknown page: noindex, no canonical');
+  check(h.title === 'Page not found · Yaay' && h.robots === 'noindex' && !h.canonical, 'unknown page: noindex, no canonical');
 
   await login(page, 'rohit@test.in');
   await page.goto(`${APP}/events/${privateEvent.slug}`); await settle(page);

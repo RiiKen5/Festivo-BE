@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-// Give an existing Festivo account admin access (sign up on the site first).
+// Give an existing Yaay account admin access (sign up on the site first).
 //
 //   node scripts/make-admin.js you@paathly.in
 //   node scripts/make-admin.js you@paathly.in --remove   # take admin away

@@ -60,16 +60,16 @@ class EmailService {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #6366f1;">Verify Your Email</h1>
         <p>Hi ${user.name},</p>
-        <p>Thank you for registering with Festivo! Please verify your email address by clicking the button below:</p>
+        <p>Thank you for registering with Yaay! Please verify your email address by clicking the button below:</p>
         <a href="${verificationUrl}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
           Verify Email
         </a>
         <p style="color: #666;">This link will expire in 24 hours.</p>
-        <p>If you didn't create an account with Festivo, please ignore this email.</p>
+        <p>If you didn't create an account with Yaay, please ignore this email.</p>
         <p style="margin-top: 24px; color: #666;">
           Best regards,<br>
-          The Festivo Team
+          The Yaay Team
         </p>
         <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
         <p style="color: #999; font-size: 12px;">
@@ -81,7 +81,7 @@ class EmailService {
 
     return this.sendEmail({
       to: user.email,
-      subject: 'Verify Your Email - Festivo',
+      subject: 'Verify Your Email - Yaay',
       html
     });
   }
@@ -89,10 +89,10 @@ class EmailService {
   async sendWelcomeEmail(user) {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #6366f1;">Welcome to Festivo!</h1>
+        <h1 style="color: #6366f1;">Welcome to Yaay!</h1>
         <p>Hi ${user.name},</p>
-        <p>Thank you for joining Festivo - your ultimate event planning platform!</p>
-        <p>With Festivo, you can:</p>
+        <p>Thank you for joining Yaay - your ultimate event planning platform!</p>
+        <p>With Yaay, you can:</p>
         <ul>
           <li>Plan and organize amazing events</li>
           <li>Find trusted vendors and service providers</li>
@@ -106,14 +106,14 @@ class EmailService {
         </a>
         <p style="margin-top: 24px; color: #666;">
           Best regards,<br>
-          The Festivo Team
+          The Yaay Team
         </p>
       </div>
     `;
 
     return this.sendEmail({
       to: user.email,
-      subject: 'Welcome to Festivo!',
+      subject: 'Welcome to Yaay!',
       html
     });
   }
@@ -132,14 +132,14 @@ class EmailService {
         <p>If you didn't request this, please ignore this email.</p>
         <p style="margin-top: 24px; color: #666;">
           Best regards,<br>
-          The Festivo Team
+          The Yaay Team
         </p>
       </div>
     `;
 
     return this.sendEmail({
       to: user.email,
-      subject: 'Password Reset - Festivo',
+      subject: 'Password Reset - Yaay',
       html
     });
   }
@@ -167,7 +167,7 @@ class EmailService {
 
     return this.sendEmail({
       to: organizer.email,
-      subject: 'Booking Confirmed - Festivo',
+      subject: 'Booking Confirmed - Yaay',
       html
     });
   }
@@ -209,13 +209,13 @@ class EmailService {
            style="display: inline-block; background: #9e3f68; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 16px 0;">
           Leave a review
         </a>
-        <p style="color: #666;">Thank you for planning with Festivo.</p>
+        <p style="color: #666;">Thank you for planning with Yaay.</p>
       </div>
     `;
 
     return this.sendEmail({
       to: organizer.email,
-      subject: reminder ? `Reminder: how was ${vendorName}? - Festivo` : `How was ${vendorName}? - Festivo`,
+      subject: reminder ? `Reminder: how was ${vendorName}? - Yaay` : `How was ${vendorName}? - Yaay`,
       html
     });
   }
@@ -242,7 +242,7 @@ class EmailService {
     `;
     return this.sendEmail({
       to,
-      subject: `${paid ? 'Your ticket' : "You're on the list"}: ${event.title} - Festivo`,
+      subject: `${paid ? 'Your ticket' : "You're on the list"}: ${event.title} - Yaay`,
       html,
       text: `${event.title}, ${when}\nYour check-in code: ${checkInCode}\n${link}`
     });
@@ -259,15 +259,15 @@ class EmailService {
         <p>${escape(notification.message)}</p>
         <a href="${link}"
            style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
-          Open in Festivo
+          Open in Yaay
         </a>
-        <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">You get this email because of activity on your Festivo bookings or events.</p>
+        <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">You get this email because of activity on your Yaay bookings or events.</p>
       </div>
     `;
 
     return this.sendEmail({
       to: user.email,
-      subject: `${notification.title} - Festivo`,
+      subject: `${notification.title} - Yaay`,
       html,
       text: `${notification.title}\n\n${notification.message}\n\n${link}`
     });

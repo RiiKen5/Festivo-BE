@@ -485,7 +485,7 @@ exports.createGuestRSVP = catchAsync(async (req, res, next) => {
     return next(new ApiError('This event is no longer accepting RSVPs', 400));
   }
   // Tickets are bought without an account too; the phone number is how the
-  // host and Festivo reach the buyer about refunds
+  // host and Yaay reach the buyer about refunds
   const needsTicket = event.entryFee > 0 && status === 'going';
 
   // The same guest changing their answer: by their private token, else by phone

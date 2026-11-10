@@ -1,6 +1,6 @@
-# Festivo Backend API
+# Yaay Backend API
 
-A complete Node.js + Express + MongoDB backend for the Festivo Event Platform - an event marketplace connecting organizers with service providers.
+A complete Node.js + Express + MongoDB backend for the Yaay Event Platform - an event marketplace connecting organizers with service providers.
 
 ## Features
 

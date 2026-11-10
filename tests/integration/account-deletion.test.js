@@ -60,7 +60,7 @@ describe('deleting your own account', () => {
 
     const check = await request(app).get('/api/v1/users/me/deletion-check').set(auth(vendor.token));
     expect(check.body.data.canDelete).toBe(false);
-    expect(check.body.data.blockers[0]).toMatch(/You owe Festivo ₹500/);
+    expect(check.body.data.blockers[0]).toMatch(/You owe Yaay ₹500/);
   });
 
   it('a past event keeps its history; free RSVPs are cancelled', async () => {

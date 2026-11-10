@@ -78,7 +78,7 @@ const until = async (fn, ms = 8000) => { const end = Date.now() + ms; while (Dat
   await Event.updateOne({ _id: paid._id }, { ticketFeePaidBy: 'guest' });
   await page.reload(); await settle(page);
   await page.getByRole('button', { name: 'Buy ticket', exact: true }).click();
-  check(await modal.getByText("Includes Festivo's 5% booking fee").isVisible(), 'fee on top is explained');
+  check(await modal.getByText("Includes Yaay's 5% booking fee").isVisible(), 'fee on top is explained');
   check(await modal.locator('.total-value').innerText().then(t => t.includes(String(Math.round(paid.entryFee * 1.05 * 100) / 100))), 'total includes the fee');
   await modal.getByRole('button', { name: 'Cancel' }).click();
   check(errors.length === 0, `no page errors ${errors.join(' | ')}`);

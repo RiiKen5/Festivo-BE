@@ -57,7 +57,7 @@ describe('emails for important notifications', () => {
     await request(app).post('/api/v1/bookings').set(auth(organizer.token)).send({ eventId: event._id, serviceId: service._id }).expect(201);
     expect(await until(() => sent.length === 1)).toBe(true);
     expect(sent[0].to).toBe('meera@example.com');
-    expect(sent[0].subject).toBe('New Booking Request - Festivo');
+    expect(sent[0].subject).toBe('New Booking Request - Yaay');
     expect(sent[0].html).toMatch(/Rohit wants to book Cakes by Meera/);
     expect(sent[0].html).toMatch(/\/bookings\//);
   });

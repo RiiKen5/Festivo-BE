@@ -55,10 +55,10 @@ exports.deletionBlockers = async (userId) => {
     blockers.push(`You have ${paidTickets} ticket(s) for upcoming events. Cancel them first to get any refund.`);
   }
   if (owedToUser > 0) {
-    blockers.push(`Festivo still owes you ₹${owedToUser}. Wait until it has been paid out to you.`);
+    blockers.push(`Yaay still owes you ₹${owedToUser}. Wait until it has been paid out to you.`);
   }
   if (user && user.penaltyDue > 0) {
-    blockers.push(`You owe Festivo ₹${round2(user.penaltyDue)}. Contact us to settle it first.`);
+    blockers.push(`You owe Yaay ₹${round2(user.penaltyDue)}. Contact us to settle it first.`);
   }
   return blockers;
 };

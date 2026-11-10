@@ -35,7 +35,7 @@ const startServer = async () => {
     server.listen(PORT, () => {
       console.log(`
 ========================================
-  Festivo API Server
+  Yaay API Server
 ========================================
   Environment: ${process.env.NODE_ENV || 'development'}
   Port: ${PORT}

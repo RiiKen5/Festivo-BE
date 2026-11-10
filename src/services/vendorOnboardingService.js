@@ -44,8 +44,8 @@ exports.createVendor = async ({ name, email, phone, city, service }, admin) => {
   const clash = await User.findOne({ $or: [{ email: cleanEmail }, ...(cleanPhone ? [{ phone: cleanPhone }] : [])] }).select('email');
   if (clash) {
     throw new ApiError(clash.email === cleanEmail
-      ? 'Someone already has a Festivo account with this email'
-      : 'Someone already has a Festivo account with this phone number', 409);
+      ? 'Someone already has a Yaay account with this email'
+      : 'Someone already has a Yaay account with this phone number', 409);
   }
 
   const user = new User({
